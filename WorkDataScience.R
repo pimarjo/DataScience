@@ -8,7 +8,7 @@ library(magrittr)
 library(rpart)
 library(rpart.plot)
 
-
+setwd("~/ISFA/3A/Data Science/ProjetDataScience/DataScience/data")
 #Initialisation des donnees ----
 
 load("data/freMTPL2freq.rda")
@@ -25,7 +25,7 @@ rm(freMTPL2freq, freMTPL2sev)
 frequence <-frequence[, ! colnames(frequence) %in% "Density"]
 
 #On formate les données de la base de frequence
-frequence$ClaimNb <- frequence$ClaimNb %>% names %>% as.numeric()
+frequence$ClaimNb <- frequence$ClaimNb %>% unname() %>% as.numeric()
 frequence$VehPower <- as.integer(frequence$VehPower)
 frequence$Exposure <- as.double(frequence$Exposure)
 frequence$Area <- as.factor(frequence$Area)
@@ -47,13 +47,15 @@ frequence <- frequence[frequence$Exposure <= 1,]
 head(frequence)
 head(severite)
 
+
 #On fusionne les bases
 base <- merge(x = frequence, y = severite, by = "IDpol")
 head(base)
 
+summary(base)
 
 #######################################################################################################
-######################_________________________   CART  _________________________######################
+######################_________________________   CART
 #######################################################################################################
 
 
@@ -88,7 +90,7 @@ prune(arbre, cp = 0.0128637) %>% rpart.plot()
 
 
 #######################################################################################################
-######################_________________________   Random forest  _________________________######################
+######################_________________________   Random forest
 #######################################################################################################
 
 
@@ -103,7 +105,7 @@ prune(arbre, cp = 0.0128637) %>% rpart.plot()
 
 
 #######################################################################################################
-######################_________________________   Neural  _________________________######################
+######################_________________________   Neural
 #######################################################################################################
 
 
@@ -118,7 +120,59 @@ prune(arbre, cp = 0.0128637) %>% rpart.plot()
 
 
 #######################################################################################################
-######################_________________________   Gradient boosting  _________________________######################
+######################_________________________   Gradient boosting 
 #######################################################################################################
 
+# paramètre : 
+set.seed(seed=100)
+.Proportion.Wanted = 0.70 # pour des question de rapiditée d'exection, j'ai déscendu la proportion a 0.01, il faut la remonter a 0.8 avent de rendre le code.
+
+# application : 
+
+#Je fais une liste d'éléments pris au hazard dans les indices de notre BDD de fréquence
+.index_entrainement <- (1:nrow(base.mean)) %>% sample(.,size = .Proportion.Wanted * nrow(base.mean))
+
+test <- base.mean[.index_entrainement,]
+train <- base.mean[! seq(from = 1, to = nrow(base.mean)) %in% .index_entrainement, ]
+
+# retour : 
+.Proportion.Achieved = round(100* nrow(train) / nrow(base.mean), 2)
+
+
+
+
+
+
+
+#fonction pour le calcul du taux d’erreur
+err_rate <- function(D,prediction){
+  #matrice de confusion
+  mc <- table(D$chiffre,prediction)
+  #taux d’erreur
+  #1- somme(individus classés correctement) / somme totale individus
+  err <- 1 - sum(diag(mc))/sum(mc)
+  print(paste("Error rate :",round(100*err,2),"%"))
+}
+
+severite.mean <- aggregate(ClaimAmount ~ IDpol, data = severite, mean)
+names(severite.mean) <- c("IDpol", "MeanClaimAmount")
+base.mean <- merge(x = frequence, y = severite.mean, by = "IDpol", all.x = T)
+base.mean$MeanClaimAmount <- replace(base.mean$MeanClaimAmount, is.na(base.mean$MeanClaimAmount), 0)
+
+
+head(base.mean,5)
+
+
+library(gbm)
+
+#On met en oeuvre une décomposition fréquence coût
+
+m.gbm.defaut <- gbm(MeanClaimAmount ~ Area + VehGas + VehBrand + VehAge + VehPower + DrivAge + Region + BonusMalus
+                    , data = base.mean
+                    , distribution="gaussian"
+                    , shrinkage = 0.01
+                    , interaction.depth = 7)
+print(m.gbm.defaut)
+print(head(summary(m.gbm.defaut),10))
+View(head(severite.mean,30))
 
