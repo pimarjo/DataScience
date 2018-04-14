@@ -40,7 +40,7 @@ frequence$Region <- as.factor(frequence$Region)
 severite$IDpol <- as.integer(severite$IDpol)
 severite$ClaimAmount <- as.numeric(severite$ClaimAmount)
 
-#On prends que les exposures supérieures à 1 ?
+#On prends que les exposures inférieures à 1 ?
 frequence <- frequence[frequence$Exposure <= 1,]
 
 #Nos bases
@@ -50,6 +50,12 @@ head(severite)
 #On fusionne les bases
 base <- merge(x = frequence, y = severite, by = "IDpol")
 head(base)
+
+
+#######################################################################################################
+######################_________________________   CART  _________________________######################
+#######################################################################################################
+
 
 #Premier arbre CART max methode anova
 rpart::rpart(formula = base$ClaimAmount ~ base$IDpol + base$ClaimNb + base$Area + base$VehPower + base$VehAge + base$DrivAge + base$BonusMalus + base$VehBrand + base$VehGas + base$Region
@@ -79,3 +85,40 @@ arbre$cptable %>% View()
 
 #j'élague l'arbre avec le paramètre de complexité qui m'amène la plus petite xstd
 prune(arbre, cp = 0.0128637) %>% rpart.plot()
+
+
+#######################################################################################################
+######################_________________________   Random forest  _________________________######################
+#######################################################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+#######################################################################################################
+######################_________________________   Neural  _________________________######################
+#######################################################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+#######################################################################################################
+######################_________________________   Gradient boosting  _________________________######################
+#######################################################################################################
+
+
