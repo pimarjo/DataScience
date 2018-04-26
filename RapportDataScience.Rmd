@@ -3,11 +3,15 @@ title: "Rapport Data Science"
 author: "Afaf JESS, Mehdi KHAIROUN, William LAURENT, Pierre MARJOLLET"
 date: "9 avril 2018"
 output:
-  word_document: default
-  pdf_document: default
   html_document:
     df_print: paged
+  pdf_document: default
+  word_document: default
 ---
+<style>
+body {
+text-align: justify}
+</style>
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -16,7 +20,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ***
 
-# I. Dataset et matériel
+# I. Matériel et pré-processing
 
 ## 1. Jeu de données
 
@@ -42,11 +46,7 @@ Enfin, **freMTPLsev** est une base sévèrité, avec simplement un identifiant e
 * **IDpol** [Entier de 139 à 6113971] : l'identifiant de la police d'assurance
 * **ClaimAmount** [Réel de 1 à 4 075 401] : coût du sinistre
 
-## 2. Objectif du projet
 
-Le but de ce projet est d'établir une tarrification pour une nouvelle police d'assurance en fonction des spécificités du potentiel assuré en fonction des caractéristiques présents dans **freMTPL2freq**. Nous procéderons par une séparation **fréquence X coût moyen** largement utilisé en tarrification. Nous supposons dès lors que la fréquence et le coût des sinistres sont deux variables indépendantes.
-
-L'objectif de ce projet est d'établir des modèles pour la fréquence et le coût moyen à l'aide de méthode de machine learning, d'en comprendre les paramètres ainsi que l'impacte sur les prédictions, de pâlier au coût en temps des méthodes employés et enfin de comparer les modèles proposés.
 
 ## 3. R et ses extentions
 
@@ -67,13 +67,38 @@ Pour pouvoir mener à bien ce projet, nous avons munit R des librairies suivante
 
 ## 1. Présentation du procédé
 
-Avant de parler de random forests (forêts aléatoires) parlons de Bagging. Le bagging de **B**ootstrap **Agg**regat**ing** est simplement un bootstrap sur des modélisations données. C'est une méthode d'aggrégation de modèles. Nous avons fait poussé des arbres dans la partie précédente; nous allons ici en faire poussé beaucoup et les aggrégés pour fabriquer des forêts!
+Avant de parler de random forests (forêts aléatoires) parlons de Bagging. Le bagging de Bootstrap Aggregating est simplement un bootstrap sur des modélisations données. C'est une méthode d'aggrégation de modèles. Nous avons fait poussé des arbres dans la partie précédente; nous allons ici en faire poussé beaucoup et les aggrégés pour fabriquer des forêts!
+
+La méthode de random forest que nous allons exploiter ici est celle qui consiste à faire un Bagging sur des arbres de régressions maximaux. On va faire pousser une forêt de $ntree$ arbres et chacun de ces arbres aura un choix aléatoire de $mtry$ variables a chaque noeud. Le seul hyperparamètre qui nous intéressera par la suite est $mtry$. $ntree$ lui est un paramètre sur la convergence des données, il va de sois qu'avec un grand $ntree$ nous convergerons que mieux. $mtry$ lui :
+
+* **Pour des petites valeurs** : les noeuds disposerons que de peu de variable pour se former, l'arbre peu être unitairement pauvre en puissance prédictive mais la correlation entre les arbres est minimisée.
+* **Pour des grandes valeurs** : les noeuds disposerons de beaucoup de variable pour se former, l'arbre peu être riche en puissance prédictive (comme un CART maximal) mais la correlation entre les arbres sera forte
+* Ainsi, $mtry$ sera déterminé par grille de paramêtres.
+
+```{r plot, echo = FALSE, fig.height=7, fig.width=10}
+
+load("data/10percentsRF.rdata")
+
+plot(
+  rf10
+  , main = "Evolution de la RMSE sur l'échantillon d'entrainement en fonction de mtry\nModèle sur la sévérité"
+  , xlab = "mtry"
+  , ylab = "rmse"
+  , sub = "25 échantillons bootstrap sur 10% de la donnée, 500 arbres par forêt"
+  )
+
+```
+Sur ce graph on trouve que la région des bons $mtry$ se trouve entre $10$ et $20$. Dans la pratique, pour un problème de régression, randomForest conseillera de prendre la racine du nombre de variable, c'est un peu plus chez nous parce que beaucoup de nos variables sont binaires et donc porte moins d'information que la variable de base.
 
 
 
-# IV. Réseaux de neuronnes
+Même si chaque arbre sur-interprête, mais les forêts étonnament ne le font pas. 
+
+mtry ; si nous le limitons, c'est pour minimiser la correlation entre les arbres de la forêts
 
 # V. Gradiant boosting machine
+
+# IV. Réseaux de neuronnes
 
 # VI. Conclusion 
 
