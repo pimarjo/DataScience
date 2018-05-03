@@ -1,28 +1,109 @@
 ---
-title: "RapportDataScience"
-author: "Pierre MARJOLLET"
+title: "Rapport Data Science"
+author: "Afaf JESS, Mehdi KHAIROUN, William LAURENT, Pierre MARJOLLET"
 date: "9 avril 2018"
-output: word_document
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
 ---
-
+<style>
+body {
+text-align: justify}
+</style>
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Rapport
+![](images/logoisfa.jpg) 
 
-On tape le rapport ici. Ca nous permettra d'avancer en même temps efficacement dans le code et le rapport.
+***
 
-```{r cars}
-summary(cars)
+# I. Matériel et pré-processing
+
+## 1. Jeu de données
+
+Les données étudiées sont deux bases issues de la librairie CASdatasets (CAS pour Computational Actuarial Sciences). **freMTPL2freq** et **freMTPL2sev** sont deux bases autos.
+
+Brièvement **freMTPL2freq** est une base de fréquence, nous donnant des caractéristiques pour des polices d'assurances données et leurs nombre de sinitres respectifs.**Cette base dispose de 12 variables et 678 013 individus**, comprenant :
+
+* **IDpol** [Clé primaire : Entier de 1 à 6 114 330] : l'identifiant de la police d'assurance
+* **ClaimNb** [Entier de 0 à 16] : le nombre de sinistres de la police
+* **Exposure** [Réel de 0 à 1] : l'exposition - la durée de vie de la police. De 0 pour une personne non assuré à 1 pour une personne assurée toute l'année
+* **Area** [Modalité de A à F] : indication sur la zone d'apparition du sinistre
+* **VehPower** [Entier de 5 à 15] : puissance du véhicule
+* **VehAge** [Entier de 0 a 100] : age du véhicule
+* **DrivAge** [Entier de 18 à 100] : age du conducteur
+* **BonusMalus** [Entier de 50 à 230] : bonus/malus du conducteur. Plus le score est haut, moins l'assuré est sanctionné par son passé
+* **VehBrabd** [Modalité de B1 à B12] : marque du véhicule
+* **VehGas** [Booléent : 0 ou 1] : véhicule diéserl ou non
+* **Density** [Entier de 1 à 1658] : densité de population de la police
+* **Region** [24 modalité de R11 à R94] : code région de la police
+
+Enfin, **freMTPLsev** est une base sévèrité, avec simplement un identifiant et une valeur de sinistre. **Cette base comprends 2 variables et 26 639 individus**:
+
+* **IDpol** [Entier de 139 à 6113971] : l'identifiant de la police d'assurance
+* **ClaimAmount** [Réel de 1 à 4 075 401] : coût du sinistre
+
+
+
+## 3. R et ses extentions
+
+Dans ce projet nous utilisons le logiciel opensource R et nous utilisons son extention RMarkdown pour la rédaction de ce rapport.
+
+Pour pouvoir mener à bien ce projet, nous avons munit R des librairies suivantes :
+
+* **caret** : **C**lassification **a**nd **re**gression **t**raining, utilisé ici pour utiliser nos algorithmes aisément sur des grilles de paramètre de tuning. Propose également une parrallélisation de ses algorithmes. **caret** dispose de tous les algorithmes nécessaire au bon déroulement de ce projet et pourrait nous suffire ici.
+* **doParallel** : s'accouple à **caret** pour accéder à la parrallélisation des algorithmes.
+* **rpart** : permets de dresser des arbres (ici des arbres de régressions).
+* **rpart.plot** : utilisé ici pour afficher des graph d'arbres de régressions.
+* **magrittr** : donner au code plus de lisibilité.
+* **etc**
+
+# II. Arbres de régression
+
+# III. Forêts aléatoires
+
+## 1. Présentation du procédé
+
+Avant de parler de random forests (forêts aléatoires) parlons de Bagging. Le bagging de Bootstrap Aggregating est simplement un bootstrap sur des modélisations données. C'est une méthode d'aggrégation de modèles. Nous avons fait poussé des arbres dans la partie précédente; nous allons ici en faire poussé beaucoup et les aggrégés pour fabriquer des forêts!
+
+La méthode de random forest que nous allons exploiter ici est celle qui consiste à faire un Bagging sur des arbres de régressions maximaux. On va faire pousser une forêt de $ntree$ arbres et chacun de ces arbres aura un choix aléatoire de $mtry$ variables a chaque noeud. Le seul hyperparamètre qui nous intéressera par la suite est $mtry$. $ntree$ lui est un paramètre sur la convergence des données, il va de sois qu'avec un grand $ntree$ nous convergerons que mieux. $mtry$ lui :
+
+* **Pour des petites valeurs** : les noeuds disposerons que de peu de variable pour se former, l'arbre peu être unitairement pauvre en puissance prédictive mais la correlation entre les arbres est minimisée.
+* **Pour des grandes valeurs** : les noeuds disposerons de beaucoup de variable pour se former, l'arbre peu être riche en puissance prédictive (comme un CART maximal) mais la correlation entre les arbres sera forte
+* Ainsi, $mtry$ sera déterminé par grille de paramêtres.
+
+```{r plot, echo = FALSE, fig.height=7, fig.width=10}
+
+load("data/10percentsRF.rdata")
+
+plot(
+  rf10
+  , main = "Evolution de la RMSE sur l'échantillon d'entrainement en fonction de mtry\nModèle sur la sévérité"
+  , xlab = "mtry"
+  , ylab = "rmse"
+  , sub = "25 échantillons bootstrap sur 10% de la donnée, 500 arbres par forêt"
+  )
+
 ```
+Sur ce graph on trouve que la région des bons $mtry$ se trouve entre $10$ et $20$. Dans la pratique, pour un problème de régression, randomForest conseillera de prendre la racine du nombre de variable, c'est un peu plus chez nous parce que beaucoup de nos variables sont binaires et donc porte moins d'information que la variable de base.
 
-## Including Plots
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
+Même si chaque arbre sur-interprête, mais les forêts étonnament ne le font pas. 
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+mtry ; si nous le limitons, c'est pour minimiser la correlation entre les arbres de la forêts
+
+# V. Gradiant boosting machine
+
+# IV. Réseaux de neuronnes
+
+# VI. Conclusion 
+
+# VII. Annexes et références
+
+## 1. Annexes
+
+## 2. Références

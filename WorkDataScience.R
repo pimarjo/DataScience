@@ -9,7 +9,11 @@ library(magrittr)
 library(rpart)
 library(rpart.plot)
 
+<<<<<<< HEAD
 setwd("~/ISFA/3A/Data Science/ProjetDataScience/DataScience")
+=======
+#setwd("~/ISFA/3A/Data Science/ProjetDataScience/DataScience/data")
+>>>>>>> 523eb97fe40e5c8cb32700f2da6f21ad8975a781
 #Initialisation des donnees ----
 
 data("freMTPL2freq")
@@ -19,6 +23,9 @@ data("freMTPL2sev")
 # On récupère les deux datasets : 
 data(freMTPL2freq)
 data(freMTPL2sev)
+
+data("freMTPL2freq")
+data("freMTPL2sev")
 
 frequence <- freMTPL2freq
 severite <- freMTPL2sev
@@ -32,7 +39,7 @@ rm(freMTPL2freq, freMTPL2sev)
 frequence <-frequence[, ! colnames(frequence) %in% "Density"]
 
 #On formate les données de la base de frequence
-frequence$ClaimNb <- frequence$ClaimNb %>% unname() %>% as.numeric()
+#frequence$ClaimNb <- frequence$ClaimNb %>% unname() %>% as.numeric()
 frequence$VehPower <- as.integer(frequence$VehPower)
 frequence$Exposure <- as.double(frequence$Exposure)
 frequence$Area <- as.factor(frequence$Area)
@@ -55,6 +62,7 @@ head(frequence)
 head(severite)
 
 
+<<<<<<< HEAD
 
 #INUTILE DE MERGE LA BASE SANS AVOIR ENLEVER LES SINISTRES GRAVES
 
@@ -67,6 +75,20 @@ head(severite)
 
 head(base,5)
 summary(base)
+=======
+severite.mean <- aggregate(ClaimAmount ~ IDpol, data = severite, mean)
+names(severite.mean) <- c("IDpol", "MeanClaimAmount")
+base.mean <- merge(x = frequence, y = severite.mean, by = "IDpol", all.x = T)
+base.mean$MeanClaimAmount <- replace(base.mean$MeanClaimAmount, is.na(base.mean$MeanClaimAmount), 0)
+
+
+head(base.mean,5)
+summary(base.mean)
+
+
+#On enlève les polices sinistrées avec un montant moyen de sinistres nul
+base.mean <- base.mean[-which(base.mean$ClaimNb > 0 & base.mean$MeanClaimAmount ==0),]
+>>>>>>> 523eb97fe40e5c8cb32700f2da6f21ad8975a781
 
 
 #On enlève les polices sinistrées avec un montant moyen de sinistres nul
@@ -177,6 +199,7 @@ prune(arbre, cp = 0.0128637) %>% rpart.plot()
 ######################_________________________   Gradient boosting 
 #######################################################################################################
 
+<<<<<<< HEAD
 library(caret)
 library(xgboost)
 library(fExtremes)
@@ -198,6 +221,22 @@ err_rate <- function(D,prediction){
 }
 
 
+=======
+# # paramètre : 
+# set.seed(seed=100)
+# .Proportion.Wanted = 0.70 # pour des question de rapiditée d'exection, j'ai déscendu la proportion a 0.01, il faut la remonter a 0.8 avent de rendre le code.
+# 
+# # application : 
+# 
+# #Je fais une liste d'éléments pris au hazard dans les indices de notre BDD de fréquence
+# .index_entrainement <- (1:nrow(base.mean)) %>% sample(.,size = .Proportion.Wanted * nrow(base.mean))
+# 
+# test <- base.mean[.index_entrainement,]
+# train <- base.mean[! seq(from = 1, to = nrow(base.mean)) %in% .index_entrainement, ]
+# 
+# # retour : 
+# .Proportion.Achieved = round(100* nrow(train) / nrow(base.mean), 2)
+>>>>>>> 523eb97fe40e5c8cb32700f2da6f21ad8975a781
 
 
 
@@ -336,6 +375,7 @@ for (i in seq(from= 1, to = 10001, by = 100)){
   res[i]<- sqrt(mean(((predict(bst_slow, base.cout.xgbM$test) - base.cout$test[,'MeanClaimAmount'])^2)))
 }
 
+<<<<<<< HEAD
 
 y_hat_valid = predict(bst_slow, base.cout.xgbM$test)
 test_mse = mean(((y_hat_valid - base.cout$test[,'MeanClaimAmount'])^2))
@@ -388,6 +428,15 @@ m.gbm.defaut <- gbm(data = base.cout$train
                     ,shrinkage = 0.01
                     ,interaction.depth = 6
                     )
+=======
+# severite.mean <- aggregate(ClaimAmount ~ IDpol, data = severite, mean)
+# names(severite.mean) <- c("IDpol", "MeanClaimAmount")
+# base.mean <- merge(x = frequence, y = severite.mean, by = "IDpol", all.x = T)
+# base.mean$MeanClaimAmount <- replace(base.mean$MeanClaimAmount, is.na(base.mean$MeanClaimAmount), 0)
+# 
+# 
+# head(base.mean,5)
+>>>>>>> 523eb97fe40e5c8cb32700f2da6f21ad8975a781
 
 
 
