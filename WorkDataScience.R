@@ -9,15 +9,15 @@ library(magrittr)
 library(rpart)
 library(rpart.plot)
 
-<<<<<<< HEAD
-setwd("~/ISFA/3A/Data Science/ProjetDataScience/DataScience")
-=======
-#setwd("~/ISFA/3A/Data Science/ProjetDataScience/DataScience/data")
->>>>>>> 523eb97fe40e5c8cb32700f2da6f21ad8975a781
 #Initialisation des donnees ----
 
 data("freMTPL2freq")
 data("freMTPL2sev")
+
+#LOADING DES JEUX DENTRAINEMENT ET DE TESTS
+load("data/trainandtest.rda")
+head(train)
+head(test)
 
 
 # On récupère les deux datasets : 
