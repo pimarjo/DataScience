@@ -4,33 +4,22 @@
 #Initialisation des packages ----
 rm(list =ls())
 
-
+library(dplyr)
 library(magrittr)
 library(rpart)
 library(rpart.plot)
+library(caret)
+library(xgboost)
+library(fExtremes)
+library(gbm)
+library(Matrix)
 
-<<<<<<< HEAD
-setwd("~/ISFA/3A/Data Science/ProjetDataScience/DataScience")
-=======
-#setwd("~/ISFA/3A/Data Science/ProjetDataScience/DataScience/data")
->>>>>>> 523eb97fe40e5c8cb32700f2da6f21ad8975a781
-#Initialisation des donnees ----
-
-data("freMTPL2freq")
-data("freMTPL2sev")
+#LOADING DES JEUX DENTRAINEMENT ET DE TESTS
+load("data/trainandtest.rda")
+head(train)
+head(test)
 
 
-# On récupère les deux datasets : 
-data(freMTPL2freq)
-data(freMTPL2sev)
-
-data("freMTPL2freq")
-data("freMTPL2sev")
-
-frequence <- freMTPL2freq
-severite <- freMTPL2sev
-
-rm(freMTPL2freq, freMTPL2sev)
 
 #Mise en forme des donnéees ----
 
@@ -199,260 +188,229 @@ prune(arbre, cp = 0.0128637) %>% rpart.plot()
 ######################_________________________   Gradient boosting 
 #######################################################################################################
 
-library(caret)
-library(xgboost)
-library(fExtremes)
-library(gbm)
-library(onehot)
+train$ClaimNb <- unname(train$ClaimNb)
+test$ClaimNb <- unname(test$ClaimNb)
+train <- train[which(train$MeanClaimAmount<20000),]
+test <- test[which(test$MeanClaimAmount<20000),]
 
-###########################
-#########_____    Fonctions utiles
-###########################
+train <- train[-which(train$ClaimNb>0 & train$MeanClaimAmount == 0),]
+test <- test[-which(test$ClaimNb>0 & test$MeanClaimAmount == 0),]
 
-#fonction pour le calcul du taux d’erreur
-err_rate <- function(D,prediction){
-  #matrice de confusion
-  mc <- table(D$chiffre,prediction)
-  #taux d’erreur
-  #1- somme(individus classés correctement) / somme totale individus
-  err <- 1 - sum(diag(mc))/sum(mc)
-  print(paste("Error rate :",round(100*err,2),"%"))
-}
+train <- cbind(train, ClaimAnnualNb = train$ClaimNb/train$Exposure)
+test <- cbind(test, ClaimAnnualNb = test$ClaimNb/test$Exposure)
 
 
-# # paramètre : 
-# set.seed(seed=100)
-# .Proportion.Wanted = 0.70 # pour des question de rapiditée d'exection, j'ai déscendu la proportion a 0.01, il faut la remonter a 0.8 avent de rendre le code.
-# 
-# # application : 
-# 
-# #Je fais une liste d'éléments pris au hazard dans les indices de notre BDD de fréquence
-# .index_entrainement <- (1:nrow(base.mean)) %>% sample(.,size = .Proportion.Wanted * nrow(base.mean))
-# 
-# test <- base.mean[.index_entrainement,]
-# train <- base.mean[! seq(from = 1, to = nrow(base.mean)) %in% .index_entrainement, ]
-# 
-# # retour : 
-# .Proportion.Achieved = round(100* nrow(train) / nrow(base.mean), 2)
+#####################################
+###########_________   Modèle de cout
+#####################################
+
+train.cout <- list(data = train[which(train$ClaimNb>0),]
+                   , label = train$MeanClaimAmount[which(train$ClaimNb>0)]
+)
+
+test.cout <- list(data = test[which(test$ClaimNb>0),]
+                  , label = test$MeanClaimAmount[which(test$ClaimNb>0)]
+)
 
 
+#On crée maintenant les flag
 
 
-
-###########################
-#########_____    Mise en forme, Ecrètement et tarification des sinistres graves
-###########################
-
-
-mePlot(severite$ClaimAmount)
-
-.seuil.grv <- 20000
-nrow(severite[which(severite$ClaimAmount>.seuil.grv),])/nrow(severite)*100
-
-att <- data.frame(severite[which(severite$ClaimAmount<=.seuil.grv),]
-                  ,rep(1,nrow(severite[which(severite$ClaimAmount<=.seuil.grv),]))
-                  )
-names(att) <- c("IDpol","ClaimAmount","AttClaimNb")
-
-
-att.mean <- aggregate(ClaimAmount ~ IDpol, data = att, mean)
-
-#On renomme
-names(att.mean) <- c("IDpol", "MeanClaimAmount")
-
-
-base <- merge(x = frequence, y = att.mean, by = "IDpol", all.x = T)
-base$MeanClaimAmount <- replace(base$MeanClaimAmount, is.na(base$MeanClaimAmount), 0)
-
-head(base,5)
-summary(base)
-base <- base[-which(base$ClaimNb >0 & base$MeanClaimAmount ==0),]
-
-grave <- data.frame(severite[which(severite$ClaimAmount>.seuil.grv),],rep(1,nrow(severite[which(severite$ClaimAmount>.seuil.grv),])))
-names(grave) <- c("IDpol","GrvClaimAmount","GrvClaimNb")
-
-surprime.grv <- sum(grave$GrvClaimAmount)/sum(base$Exposure)
-
-#La surprime est de ...
-surprime.grv
+train.cout.xgb = xgb.DMatrix(data = cbind(predict(dummyVars(data=train.cout$data,formula = "~Area"), newdata = train.cout$data)
+                                          , predict(dummyVars(data=train.cout$data,formula = "~VehPower"), newdata = train.cout$data)
+                                          , VehAge = train.cout$data$VehAge
+                                          , DrivAge = train.cout$data$DrivAge
+                                          , BonusMalus = train.cout$data$BonusMalus
+                                          , predict(dummyVars(data=train.cout$data,formula = "~VehBrand"), newdata = train.cout$data)
+                                          , predict(dummyVars(data=train.cout$data,formula = "~VehGas"), newdata = train.cout$data)
+                                          , Density = train.cout$data$Density
+                                          , predict(dummyVars(data=train.cout$data,formula = "~Region"), newdata = train.cout$data)
+)
+, label = train.cout$label)
 
 
 
-##############################################
-################_____ Modèle de cout
-##############################################
-
-#On ne garde que les polices sinistrées
-base.cout <- base[which(base$ClaimNb>0),]
-
-###########################
-#########_____    Séparation des données en 3 jeux: train, validation et test
-###########################
-
-
-
- base.cout.oh <- predict(onehot(base.cout, stringsAsFactors = T, addNA = FALSE, max_levels = 100)
-                      , base.cout)
+test.cout.xgb = xgb.DMatrix(data = cbind(predict(dummyVars(data=test.cout$data,formula = "~Area"), newdata = test.cout$data)
+                                         , predict(dummyVars(data=test.cout$data,formula = "~VehPower"), newdata = test.cout$data)
+                                         , VehAge = test.cout$data$VehAge
+                                         , DrivAge = test.cout$data$DrivAge
+                                         , BonusMalus = test.cout$data$BonusMalus
+                                         , predict(dummyVars(data=test.cout$data,formula = "~VehBrand"), newdata = test.cout$data)
+                                         , predict(dummyVars(data=test.cout$data,formula = "~VehGas"), newdata = test.cout$data)
+                                         , Density = test.cout$data$Density
+                                         , predict(dummyVars(data=test.cout$data,formula = "~Region"), newdata = test.cout$data)
+)
+, label = test.cout$label)
 
 
-#Les proportions que l'on veut pour nos différentes bases
-proportion.train <- 0.5
-porportion.valid <- 0.25
-proportion.test <- 0.25
+###########________   Un 1er modèle
 
-#On stocke toute les bases dans une liste de base, c'est plus simple à utiliser
+#On train un premier modèle à l'aide la fonction xgb.train
+watchlist = list(train = train.cout.xgb
+                 ,test = test.cout.xgb)
 
-#Les indices pour la base de train
-sample.train <- sample.int(n = nrow(base.cout)
-                           , size = floor(proportion.train*nrow(base.cout))
-                           , replace = F)
-
-#Une base temporaire qui est le reste de la base initiale après la division pour la de train
-base.temp <- base.cout[-sample.train,]
-
-sample.test <- base.temp %>% nrow() %>% sample.int(n=.
-                                                   , size = floor(porportion.valid/proportion.train*.)
-                                                   , replace = F)
-
-
-#On crée les bases et la liste
-base.cout <- list(full = base.cout
-                  , train = base.cout[sample.train,]
-                  , test = base.temp[sample.test,]
-                  , valid = base.temp[-sample.test,])
-
-
-###########################
-#########_____    Modélisation
-###########################
-#On crée une liste des bases au format xgbMatrix
-base.cout.xgbM <- list(train = xgb.DMatrix(data = base.cout$train[,-c(1,3,length(base.cout$full[1,]))]
-                                           , label = base.cout$train[,'MeanClaimAmount'])
-                       ,test = xgb.DMatrix(data = base.cout$test[,-c(1,3,length(base.cout$full[1,]))]
-                                          , label = base.cout$test[,'MeanClaimAmount'])
-                       ,valid = xgb.DMatrix(data = base.cout$valid[,-c(1,3,length(base.cout$full[1,]))]
-                                            , label = base.cout$valid[,'MeanClaimAmount'])
-                       )
-
-
-
-#################
-####____  Premier modèle (paramètres par défaut)
-################
-
-
-watchlist <- list(train = base.cout.xgbM$train, valid = base.cout.xgbM$valid)
-
-
-bst_slow = xgb.train(data = base.cout.xgbM$train 
-                     , max.depth = 2
-                     , alpha = 0
-                     , lambda = 1
-                     , eta = 0.0001 
-                     , nthread = 2 
-                     , nround = 1000
-                     , watchlist = watchlist
-                     , objective = "reg:linear" 
-                     , print_every_n = 500)
-
-res <- rep(0,100)
-for (i in seq(from= 1, to = 10001, by = 100)){
-  bst_slow = xgb.train(data = base.cout.xgbM$train 
-                       , max.depth = 10
-                       , alpha = 0
-                       , lambda = 1
-                       , eta = 0.0001 
-                       , nthread = 2 
-                       , nround = i
+cout.fit.1 = xgb.train(data = train.cout.xgb 
+                       , max.depth = 4
+                       , eta = 0.3
+                       , gamma = 1
+                       , colsample_bytree = 0.8
+                       , subsample = 0.8
+                       , nround = 100
                        , watchlist = watchlist
-                       , objective = "reg:linear"
-                       , verbose = 0
-                       )
-  print(i)
-  
-  res[i]<- sqrt(mean(((predict(bst_slow, base.cout.xgbM$test) - base.cout$test[,'MeanClaimAmount'])^2)))
-}
+                       , print_every_n = 500
+                       , early_stopping_rounds = 50)
+
+pred.cout.1 <- predict(cout.fit.1, test.cout.xgb)
+View(cbind(test.cout$data, test.cout$label, pred.cout.1))
+
+#Nous avons un biais de 48
+pred.cout.1 %>% mean()
+test.cout$label %>% mean()
+
+###########________   Optimisation des paramètres de tuning
+
+#On cherche maintenant à optimiser les paramètres de tuning
+#Nous fixons le nombres d'arbres à 10 et nous cherchons les autres paramètres qui minimisent le RMSE
+
+# on complète notre grille de paramètres
+
+xgb.grid.1 = expand.grid(nrounds = 50
+                         , max_depth = c(3,6,9)
+                         , eta = c(0.01, 0.001, 0.0001)
+                         , gamma = c(0.2,0.4,0.6,0.8,1)
+                         , colsample_bytree = c(0.2,0.4,0.6,0.8,1)
+                         , min_child_weight = c(0.2,0.4,0.6,0.8,1)
+                         , subsample = 0.8
+)
+xgb.grid.1
 
 
-y_hat_valid = predict(bst_slow, base.cout.xgbM$test)
-test_mse = mean(((y_hat_valid - base.cout$test[,'MeanClaimAmount'])^2))
-test_rmse = sqrt(test_mse)
-test_rmse
-
-
-#################
-####____  Optimisation paramètres de tunning
-################
-
-
-
-# on regarde les paramètres du modèle
-modelLookup("xgbLinear")
-
-# on set up la grille de paramètres
-
-xgb_grid_1 = expand.grid(nrounds = c(1000,2000,3000,4000) ,
-                         eta = c(0.01, 0.001, 0.0001),
-                         lambda = 1,
-                         alpha = 0)
-xgb_grid_1
-
-
-#on utilise une cross validation
-xgb_trcontrol_1 = trainControl(method = "cv",
-                               number = 5,
+#On fait une cross validation
+xgb.trcontrol.1 = trainControl(method = "cv",
+                               number = 7,
                                verboseIter = TRUE,
                                returnData = FALSE,
                                returnResamp = "all", 
                                allowParallel = TRUE)
 
-#on train
-xgb_train_1 = train(x = base.cout.xgbM$train,
-                    y = base.cout$train[,'MeanClaimAmount'],
-                    trControl = xgb_trcontrol_1,
-                    tuneGrid = xgb_grid_1,
-                    method = "xgbLinear",
-                    max.depth = 5)
+#On train, ça prend du temps, beaucoup de temps
+xgb.train.1 = train(x = train.cout.xgb,
+                    y = train.cout$label,
+                    trControl = xgb.trcontrol.1,
+                    tuneGrid = xgb.grid.1,
+                    method = "xgbTree")
 
 
+#Nous allons maintenant chercher le nombre d'arbres optimal
 
 
+xgb.grid.2 = expand.grid(nrounds = seq(from = 1, to = 1001, by = 5)
+                         , max_depth = xgb.train.1$bestTune$max_depth
+                         , eta = xgb.train.1$bestTune$eta
+                         , gamma = xgb.train.1$bestTune$gamma
+                         , colsample_bytree = xgb.train.1$bestTune$colsample_bytree
+                         , min_child_weight = xgb.train.1$bestTune$min_child_weight
+                         , subsample = xgb.train.1$bestTune$subsample
+)
 
-m.gbm.defaut <- gbm(data = base.cout$train
-                    ,formula = MeanClaimAmount ~ VehGas + VehBrand + VehAge + VehPower + DrivAge + Area +  BonusMalus + Region
+
+xgb.trcontrol.2 = trainControl(method = "cv",
+                               number = 7,
+                               verboseIter = TRUE,
+                               returnData = FALSE,
+                               returnResamp = "all", 
+                               allowParallel = TRUE)
+
+
+xgb.train.2 = train(x = train.cout.xgb
+                    , y = train.cout$label
+                    , trControl = xgb.trcontrol.2
+                    , tuneGrid = xgb.grid.2
+                    , method = "xgbTree")
+
+
+#On affiche la progression du RMSE en fonction de nombre d'arbres
+plot(x = xgb.train.2$results$nrounds[which(xgb.train.2$results$RMSE<=1800)]
+     , y = xgb.train.2$results$RMSE[which(xgb.train.2$results$RMSE<=1800)]
+     , type = "l"
+     , xlab = "Nombre d'arbres"
+     , ylab = "RMSE"
+     , main = "RMSE en fonction du nombre d'arbres"
+)
+
+#On affiche à partir de quand on commence l'overfitting
+abline(h = xgb.train.2$results$RMSE[which(xgb.train.2$results$nrounds == xgb.train.2$bestTune$nrounds)], col = "red")
+abline(v=xgb.train.2$bestTune$nrounds, col = "red")
+
+
+#####################################
+###########_________   Modèle de fréquence
+#####################################
+
+train <- train[which(train$ClaimAnnualNb<=10),]
+test <- test[which(test$ClaimAnnualNb<=10),]
+
+train.freq <- list(data = train[which(train$ClaimAnnualNb<=10),]
+                   , label = train$ClaimAnnualNb[which(train$ClaimAnnualNb<=10)]
+)
+
+test.freq <- list(data = test[which(test$ClaimAnnualNb<=10),]
+                  , label = test$ClaimAnnualNb[which(test$ClaimAnnualNb<=10)]
+)
+
+train.freq.sparse = Matrix(sparse = F
+                           , data = cbind(predict(dummyVars(data=train.freq$data,formula = "~Area"), newdata = train.freq$data)
+                                          , predict(dummyVars(data=train.freq$data,formula = "~VehPower"), newdata = train.freq$data)
+                                          , VehAge = train.freq$data$VehAge
+                                          , DrivAge = train.freq$data$DrivAge
+                                          , BonusMalus = train.freq$data$BonusMalus
+                                          , predict(dummyVars(data=train.freq$data,formula = "~VehBrand"), newdata = train.freq$data)
+                                          , predict(dummyVars(data=train.freq$data,formula = "~VehGas"), newdata = train.freq$data)
+                                          , Density = train.freq$data$Density
+                                          , predict(dummyVars(data=train.freq$data,formula = "~Region"), newdata = train.freq$data)
+                           ))
+
+train.freq.xgb = xgb.DMatrix(data = train.freq.sparse
+                             , label = train.freq$label)
+
+
+watchlist = list(train = train.freq.xgb
+                 #,test = test.cout.xgb
+)
+
+cout.fit.1 = xgboost(data = train.freq.sparse
+                     , label = train.freq$label
+                     , obj = NULL
+                     , feval = NULL
+                     , max.depth = 4
+                     , eta = 0.3
+                     , gamma = 1
+                     , colsample_bytree = 0.8
+                     , subsample = 0.8
+                     , nround = 1000
+                     , watchlist = watchlist
+                     , print_every_n = 10
+                     , early_stopping_rounds = 50)
+
+m.gbm.defaut <- gbm(data = train
+                    ,formula = ClaimNb ~  VehBrand   + DrivAge  + Region + BonusMalus + Density + VehGas + VehAge
                     ,distribution = "gaussian"
-                    ,n.trees = 1000
-                    ,shrinkage = 0.01
-                    ,interaction.depth = 6
-                    )
-
-# severite.mean <- aggregate(ClaimAmount ~ IDpol, data = severite, mean)
-# names(severite.mean) <- c("IDpol", "MeanClaimAmount")
-# base.mean <- merge(x = frequence, y = severite.mean, by = "IDpol", all.x = T)
-# base.mean$MeanClaimAmount <- replace(base.mean$MeanClaimAmount, is.na(base.mean$MeanClaimAmount), 0)
-# 
-# 
-# head(base.mean,5)
-
-
-
-
-
+                    , weights = train[,'Exposure']
+                    ,n.trees  = 200
+                    ,shrinkage = 0.1
+                    ,interaction.depth = 5
+                    ,n.minobsinnode = 500
+                    , train.fraction = 0.75
+                    
+)
 print(m.gbm.defaut)
-print(head(summary(m.gbm.defaut),10))
-pred <- predict(m.gbm.defaut, base.cout$test, n.trees = 100)
+print(head(summary(m.gbm.defaut),200))
+pred <- predict(m.gbm.defaut,test, n.trees = 200)
 
 
-(pred - base.cout$test$MeanClaimAmount)^2 %>% mean() %>% sqrt()
+(pred - test$ClaimNb)^2 %>% mean() %>% sqrt()
+head(pred,100)
 
-
-length(pred[which(pred<0)])
-#typeof(pred)
-mean(pred[which(pred>0)])
-mean(base.mean.sev$MeanClaimAmount)
-
-gbm.perf(m.gbm.defaut,oobag.curve = T,method = "test")
-
-
-
-
+pred %>% mean()
+test$ClaimNb %>% mean()
+train.freq$data$ClaimAnnualNb[which(train.freq$data$ClaimAnnualNb<10)]%>%summary()
