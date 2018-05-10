@@ -303,6 +303,8 @@ xgb.train.1 = train(x = train.cout.xgb,
                     method = "xgbTree")
 
 
+# Fitting nrounds = 50, max_depth = 3, eta = 0.01, gamma = 0.8, colsample_bytree = 1, min_child_weight = 0.8, subsample = 0.8 on full training set
+
 #Nous allons maintenant chercher le nombre d'arbres optimal
 
 
@@ -372,7 +374,15 @@ train.freq.sparse = Matrix(sparse = F
                                           , predict(dummyVars(data=train.freq$data,formula = "~Region"), newdata = train.freq$data)
                            ))
 
-train.freq.xgb = xgb.DMatrix(data = train.freq.sparse
+train.freq.xgb = xgb.DMatrix(data = as.matrix(cbind(predict(dummyVars(data=train.freq$data,formula = "~Area"), newdata = train.freq$data)
+                                                 , predict(dummyVars(data=train.freq$data,formula = "~VehPower"), newdata = train.freq$data)
+                                                 , VehAge = train.freq$data$VehAge
+                                                 , DrivAge = train.freq$data$DrivAge
+                                                 , BonusMalus = train.freq$data$BonusMalus
+                                                 , predict(dummyVars(data=train.freq$data,formula = "~VehBrand"), newdata = train.freq$data)
+                                                 , predict(dummyVars(data=train.freq$data,formula = "~VehGas"), newdata = train.freq$data)
+                                                 , Density = train.freq$data$Density
+                                                 , predict(dummyVars(data=train.freq$data,formula = "~Region"), newdata = train.freq$data)))
                              , label = train.freq$label)
 
 
@@ -380,16 +390,13 @@ watchlist = list(train = train.freq.xgb
                  #,test = test.cout.xgb
 )
 
-cout.fit.1 = xgboost(data = train.freq.sparse
-                     , label = train.freq$label
-                     , obj = NULL
-                     , feval = NULL
-                     , max.depth = 4
+cout.fit.1 = xgb.train(data = train.freq.xgb
+                     , max.depth = 2
                      , eta = 0.3
                      , gamma = 1
                      , colsample_bytree = 0.8
-                     , subsample = 0.8
-                     , nround = 1000
+                     , subsample = 0.3
+                     , nround = 30
                      , watchlist = watchlist
                      , print_every_n = 10
                      , early_stopping_rounds = 50)
