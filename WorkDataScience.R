@@ -14,10 +14,12 @@ library(fExtremes)
 library(gbm)
 library(Matrix)
 
+
 #LOADING DES JEUX DENTRAINEMENT ET DE TESTS
 load("data/trainandtest.rda")
 head(train)
 head(test)
+
 
 
 
