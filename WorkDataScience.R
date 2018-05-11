@@ -17,8 +17,9 @@ library(Matrix)
 
 #LOADING DES JEUX DENTRAINEMENT ET DE TESTS
 load("data/trainandtest.rda")
-head(train)
 head(test)
+head(train)
+
 
 
 
@@ -192,14 +193,23 @@ prune(arbre, cp = 0.0128637) %>% rpart.plot()
 
 train$ClaimNb <- unname(train$ClaimNb)
 test$ClaimNb <- unname(test$ClaimNb)
-train <- train[which(train$MeanClaimAmount<20000),]
-test <- test[which(test$MeanClaimAmount<20000),]
+train <- train[which(train$MeanClaimAmount<=20000),]
+test <- test[which(test$MeanClaimAmount<=20000),]
 
 train <- train[-which(train$ClaimNb>0 & train$MeanClaimAmount == 0),]
 test <- test[-which(test$ClaimNb>0 & test$MeanClaimAmount == 0),]
 
 train <- cbind(train, ClaimAnnualNb = train$ClaimNb/train$Exposure)
 test <- cbind(test, ClaimAnnualNb = test$ClaimNb/test$Exposure)
+
+proportion.valid <- 0.5
+sample.valid <- sample.int(nrow(test), size = nrow(test)*proportion.valid)
+
+valid <- test[sample.valid,]
+test <- test[-sample.valid,]
+
+save(list = c("train", "valid", "test")
+     , file = "./data/train&valid&test.RData")
 
 
 #####################################
@@ -218,7 +228,7 @@ test.cout <- list(data = test[which(test$ClaimNb>0),]
 #On crée maintenant les flag
 
 
-train.cout.xgb = xgb.DMatrix(data = cbind(predict(dummyVars(data=train.cout$data,formula = "~Area"), newdata = train.cout$data)
+train.cout.xgb <<- xgb.DMatrix(data = cbind(predict(dummyVars(data=train.cout$data,formula = "~Area"), newdata = train.cout$data)
                                           , predict(dummyVars(data=train.cout$data,formula = "~VehPower"), newdata = train.cout$data)
                                           , VehAge = train.cout$data$VehAge
                                           , DrivAge = train.cout$data$DrivAge
@@ -232,7 +242,7 @@ train.cout.xgb = xgb.DMatrix(data = cbind(predict(dummyVars(data=train.cout$data
 
 
 
-test.cout.xgb = xgb.DMatrix(data = cbind(predict(dummyVars(data=test.cout$data,formula = "~Area"), newdata = test.cout$data)
+test.cout.xgb <<- xgb.DMatrix(data = cbind(predict(dummyVars(data=test.cout$data,formula = "~Area"), newdata = test.cout$data)
                                          , predict(dummyVars(data=test.cout$data,formula = "~VehPower"), newdata = test.cout$data)
                                          , VehAge = test.cout$data$VehAge
                                          , DrivAge = test.cout$data$DrivAge
@@ -303,34 +313,35 @@ xgb.train.1 = train(x = train.cout.xgb,
                     method = "xgbTree")
 
 
+
+
 # Fitting nrounds = 50, max_depth = 3, eta = 0.01, gamma = 0.8, colsample_bytree = 1, min_child_weight = 0.8, subsample = 0.8 on full training set
+
+
+xgb.fit.cout.2 <- xgb.train(data = train.cout.xgb
+                            , nrounds = 50
+                            , max_depth = 3
+                            , eta = 0.01
+                            , gamma = 0.8
+                            , colsample_bytree = 1
+                            , min_child_weight = 0.8
+                            , subsample = 0.8
+                            , watchlist = watchlist
+                            , print_every_n = 10)
 
 #Nous allons maintenant chercher le nombre d'arbres optimal
 
 
-xgb.grid.2 = expand.grid(nrounds = seq(from = 1, to = 1001, by = 5)
-                         , max_depth = xgb.train.1$bestTune$max_depth
-                         , eta = xgb.train.1$bestTune$eta
-                         , gamma = xgb.train.1$bestTune$gamma
-                         , colsample_bytree = xgb.train.1$bestTune$colsample_bytree
-                         , min_child_weight = xgb.train.1$bestTune$min_child_weight
-                         , subsample = xgb.train.1$bestTune$subsample
-)
-
-
-xgb.trcontrol.2 = trainControl(method = "cv",
-                               number = 7,
-                               verboseIter = TRUE,
-                               returnData = FALSE,
-                               returnResamp = "all", 
-                               allowParallel = TRUE)
-
-
-xgb.train.2 = train(x = train.cout.xgb
-                    , y = train.cout$label
-                    , trControl = xgb.trcontrol.2
-                    , tuneGrid = xgb.grid.2
-                    , method = "xgbTree")
+mod.cout <- xgb.train(data = train.cout.xgb
+                      , nrounds = 1000#à renseigner
+                      , max_depth = 3
+                      , eta = 0.01
+                      , gamma = 0.8
+                      , colsample_bytree = 1
+                      , min_child_weight = 0.8
+                      , subsample = 0.8
+                      , watchlist = watchlist
+                      , early_stopping_rounds = 10)
 
 
 #On affiche la progression du RMSE en fonction de nombre d'arbres
@@ -343,8 +354,99 @@ plot(x = xgb.train.2$results$nrounds[which(xgb.train.2$results$RMSE<=1800)]
 )
 
 #On affiche à partir de quand on commence l'overfitting
-abline(h = xgb.train.2$results$RMSE[which(xgb.train.2$results$nrounds == xgb.train.2$bestTune$nrounds)], col = "red")
+# abline(h = xgb.train.2$results$RMSE[which(xgb.train.2$results$nrounds == xgb.train.2$bestTune$nrounds)], col = "red")
 abline(v=xgb.train.2$bestTune$nrounds, col = "red")
+
+#on train le modèle de coût retenu
+
+mod.cout <- xgb.train(nrounds = #à renseigner
+                      , max_depth = 3
+                      , eta = 0.01
+                      , gamma = 0.8
+                      , colsample_bytree = 1
+                      , min_child_weight = 0.8
+                      , subsample = 0.8
+                      , watchlist = watchlist)
+
+
+
+#on peut s'amuser à grapher d'autres sensibilités
+
+xgb.grid.1
+sensib <- function(tune.grid){
+  xgb.fit <- xgb.train(data = train.cout.xgb
+                       ,nrounds = tune.grid[1]
+                       , max_depth = tune.grid[2]
+                       , eta = tune.grid[3]
+                       , gamma = tune.grid[4]
+                       , colsample_bytree = tune.grid[5]
+                       , min_child_weight = tune.grid[6]
+                       , subsample = tune.grid[7]
+                       , watchlist = watchlist
+                       , print_every_n = 1000)
+  return(xgb.fit$evaluation_log$train_rmse %>% tail(.,1))
+}
+
+xgb.grid.2 <- expand.grid(nrounds = seq(from = 1, to = 1001, by = 5)
+                           , max_depth = 3
+                           , eta = 0.01
+                           , gamma = 0.8
+                           , colsample_bytree = 1
+                           , min_child_weight = 0.8
+                           , subsample = 1
+)
+
+sensib_nrounds <- apply(xgb.grid.2
+                        , MARGIN = 1
+                        , FUN = sensib)
+
+
+
+
+
+xgb.grid.cout.max_depth <- expand.grid(nrounds = xgb.train.2$bestTune$nrounds 
+                         , max_depth = seq(from = 1, to = 10, by = 1)
+                         , eta = 0.01
+                         , gamma = 0.8
+                         , colsample_bytree = 1
+                         , min_child_weight = 0.8
+                         , subsample = 1
+)
+
+sensib_max_depth <- apply(xgb.grid.cout.max_depth
+                        , MARGIN = 1
+                        , FUN = sensib)
+
+
+plot(x = xgb.grid.cout.max_depth$max_depth
+     , y = sensib_nrounds
+     , xlab = "Profondeur maximale"
+     , ylab = "RMSE"
+     , type = "l"
+     )
+
+
+
+#le rmse décroit et atteint un minimum en 2
+plot(x = xgb.train.cout.max_depth$results$max_depth
+     , y = xgb.train.cout.max_depth$results$RMSE
+     , type = "l"
+     , xlab = "Max_depth"
+     , ylab = "RMSE"
+     , main = "RMSE en fonction de la profondeur maximale des arbres"
+)
+
+
+
+#On affiche la prédiction
+
+pred.cout <- predict(mod.cout, test.cout.xgb)
+View(cbind(test.cout$data, test.cout$label, pred.cout))
+
+#Nous avons un biais de 48
+pred.cout %>% mean()
+test.cout$label %>% mean()
+
 
 
 #####################################
