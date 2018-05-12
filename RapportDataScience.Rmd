@@ -1,6 +1,6 @@
 ---
 title: "Rapport Data Science"
-author: "Afaf JESS, Mehdi KHAIROUN, William LAURENT, Pierre MARJOLLET"
+author: "Afaf Tabammout, Mehdi KHAIROUN, William LAURENT, Pierre MARJOLLET"
 date: "9 avril 2018"
 output:
   html_document:
@@ -143,6 +143,21 @@ Les tests sur la base de test révèlent que notre modèle est également biais�
 
 
 # V. Réseaux de neuronnes
+
+    A. Présentation du procédé
+
+Le réseau de neurones artificiels a été inspiré du mécanisme du système nerveux humain, à travers l’histoire on a cherché à imiter son fonctionnement en commençant par le neurone formel apparu en 1943 avec une modélisation mathématique  du neurone biologique, puis par les premières règles d’apprentissage de Hebb en 1949 et de l’algorithme d’apprentissage de rétropropagation en 1986 par Rumelhart.
+
+Cet algorithme  est utilisé dans le  cadre des problématiques de classification, de reconnaissance de formes, d’association, d’extractions  de caractéristiques, d’identification…
+
+En assurance, l’avantage de cet algorithme est de pou voir capter les dépendances non linéaires entre les variables explicatives pour pouvoir affiner le tarif et appréhender le risque.
+
+Pour les parties qui suivent, le  paramètre le plus  important  qui serait à déterminer est  représenté par le nombre de neurones sur la couche cachée parallèlement aux conditions d’apprentissage que nous citerons par la suite:
+
+Pour le calibrage des deux modèles Fréquence et Coût, nous avons utilisé plusieurs fonctions  intégrées sous R:
+
+-Tune.nnet du package
+- Nnet du package
 
 # VI. Conclusion 
 
