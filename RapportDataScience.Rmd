@@ -182,7 +182,7 @@ Et le meilleur modèle est celui avec $mtry=2$ même s'il est plutôt biaisé pa
 
 Comme pour la partie précédente, nous avons tourner nos algorithme sur sur la sévérité pour obtenir une idée d'un bon $mtry$
 
-```{r comparaison foret exposure, echo = FALSE, fig.height=7, fig.width=10}
+```{r comparaison foret, echo = FALSE, fig.height=7, fig.width=10}
 
 load("data/1_20mtryonfreq_results.rda")
 
