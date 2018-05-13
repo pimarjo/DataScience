@@ -1180,3 +1180,36 @@ xgb.save(mod.freq.xgb, fname = "./xgboost/mod.freq.xgb.xgboost")
 test$ClaimNb %>% mean()
 train.freq$data$ClaimAnnualNb[which(train.freq$data$ClaimAnnualNb<10)]%>%summary()
 
+                                         
+                                         
+# CONCLUSION 
+
+#Modèles gagnants
+
+load("data/rf_final_cout_predictions.rda")
+load("data/rf_freq_final_expo_as_exp.rda")
+load("data/trainandtest.rda")
+
+test$ClaimNb <- as.numeric(test$ClaimNb)
+
+predictions_cout <- predictions_model_cout_final[[2]]
+predictions_freq <- predict(rf_freq_final_expo_as_exp, test)
+
+test$predictoin_cout <- predictions_cout
+test$predictoin_freq <- predictions_freq
+
+test$cout_x_freq <- test$predictoin_cout * test$predictoin_freq
+
+individus <- rbind(
+  test[test$Density > 2000 & test$MeanClaimAmount > 0 & test$BonusMalus > 50, ][1,],
+  test[test$Density < 100 & test$MeanClaimAmount > 0 & test$BonusMalus > 50, ][5,],
+  test[test$Exposure > 0.9 & test$MeanClaimAmount > 0 & test$BonusMalus > 50,][30,],
+  test[test$VehPower  == 13 & test$MeanClaimAmount > 0 & test$BonusMalus > 50,][1,],
+  test[test$VehPower == 5,][1,],
+  test[test$VehAge == 0,][76, ],
+  test[test$BonusMalus == 230,][1,],
+  test[test$BonusMalus > 150,][5,],
+  test[test$DrivAge == 18& test$MeanClaimAmount > 0,][1,],
+  test[test$DrivAge == 100& test$MeanClaimAmount > 0,][1,]
+)                                         
+                                       
