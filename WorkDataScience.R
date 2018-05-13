@@ -16,11 +16,10 @@ library(Matrix)
 
 
 #LOADING DES JEUX DENTRAINEMENT ET DE TESTS
-data("freMTPL2freq")
-data("freMTPL2sev")
-load("./data/train&valid&test.RData")
+
+load("./data/trainandtest.rda")
 head(test)
-head(valid)
+
 head(train)
 
 
@@ -130,35 +129,151 @@ test %>% summary()
 ######################_________________________   CART
 #######################################################################################################
 
+# ------------------------------- INITIALISATION DES PACKAGES --------------------------------- #
+library(CASdatasets)
+library(magrittr)
+library(rpart)
+library(rpart.plot)
+library(sp)
+library(xts)
 
-#Premier arbre CART max methode anova
-rpart::rpart(formula = base$ClaimAmount ~ base$IDpol + base$ClaimNb + base$Area + base$VehPower + base$VehAge + base$DrivAge + base$BonusMalus + base$VehBrand + base$VehGas + base$Region
-             , weights = base$Exposure
-             , method = "anova"
-             , control = list(cp = 0)) -> arbre
+# -------------------------------   TRAITEMENT DES DONNEES   --------------------------------- #
 
-arbre %>% rpart.plot::rpart.plot()
+train$VehPower <- as.integer(train$VehPower)
+train$Exposure <- as.double(train$Exposure)
+train$Area <- as.factor(train$Area)
+train$VehAge <- as.integer(train$VehAge)
+train$DrivAge <- as.integer(train$DrivAge)
+train$BonusMalus <- as.integer(train$BonusMalus)
+train$VehBrand <- as.factor(train$VehBrand)
+train$VehGas <- as.factor(train$VehGas)
+train$Region <- as.factor(train$Region)
+train$MeanClaimAmount <- as.numeric(train$MeanClaimAmount)
+train$ClaimNb <- as.numeric(train$ClaimNb)
+train_NonNulle = train[-which(train$MeanClaimAmount == 0),]
 
-arbre %>% rpart::plotcp()
+# ------------------------------- APPLICATION DE LA METHODE CART ------------------------------ #
 
-#Je vois pas quoi en faire...
-arbre %>% rpart::printcp()
+### ----------------- MODELE SEVERITE
+## Premier essais arbre CART 
+ad.Claim = rpart(MeanClaimAmount ~ Area + VehPower + VehAge + DrivAge + BonusMalus + VehBrand + VehGas + Region + Density
+                 , weights = Exposure
+                 , data = train_NonNulle
+                 , method = "anova"
+                 , control = rpart.control(cp = 0))
+prp(ad.Claim,extra = 1, type = 2, branch = 1, cex = 0.5, Margin = 0 ) 
+# Arbre illisible, ajout d'une contraite sur le nb d'ind min par feuille avec minbucket
 
-#Arbre avec poisson
-rpart(formula = ClaimAmount ~ ClaimNb + Area + VehPower + VehAge + DrivAge + BonusMalus + VehBrand + VehGas + Region
-      , weights = Exposure
-      , method = "poisson"
-      , data = base
-      , control = list(cp = 0, minsplit = 1)) -> arbre
+## ARBRE COMPLET SEVERITE
+ad.Claim2 = rpart(MeanClaimAmount ~ Area + VehPower + VehAge + DrivAge + BonusMalus + VehBrand + VehGas + Region + Density
+                  , weights = Exposure
+                  , data = train_NonNulle
+                  , method = "anova"
+                  , control = rpart.control( minbucket = 500, cp = 0))
+summary((adOpt.Claim2))
+## SORTIES GRAPHIQUES
+names(ad.Claim2)
+plotcp(ad.Claim2); 
+printcp(ad.Claim2)
+prp(ad.Claim2, uniform = TRUE, extra = 0, type = 2, branch = 0, cex = 0.7, Margin = 0, compress = TRUE)
 
-#Je plot les cp (parametre de complexité)
-arbre %>% plotcp()
+# Complexite
+plot(ad.Claim2$cptable[1:16,2], ad.Claim2$cptable[1:16,4],xlab='Complexite',ylab='CV erreur',main='Evo du CP')
 
-arbre$cptable %>% View()
+## SIMPLIFICATION DE L'ARBRE
+# Recuperation du cp minimisant 
+adOpt.Claim2 = prune(ad.Claim2, cp = ad.Claim2$cptable[which.min(ad.Claim2$cptable[,4]),1]) 
+
+# Representation de l'arbre obtenu
+par(mfrow = c(1, 1), mar = c(1, 1, 1, 1))
+plot(adOpt.Claim2, uniform = T, compress = T, margin = 0.1, branch = 0.3)
+text(adOpt.Claim2, use.n = T, digits = 3, cex = 0.6)
+prp(adOpt.Claim2, uniform = TRUE, extra=1,type=1, branch = 0, cex = 0.7, Margin = 0, compress=TRUE)
+
+## PREVISIONS
+# Calcul des prévisions sur l'echantillon de TRAIN
+preds = predict(adOpt.Claim2)
+mc = table(train_NonNulle$MeanClaimAmount,preds)
+mc1=as.data.frame(cbind(train_NonNulle$MeanClaimAmount,preds))
+View(mc1)
+mc
+
+summary(train_NonNulle$MeanClaimAmount)
+summary(preds)
+sum((preds-train_NonNulle$MeanClaimAmount)^2)/nrow(train_NonNulle)# Erreur quadratique moyenne de prévision
+#3006876
+
+# Calcul des prévisions sur l'echantillon TEST
+test_NonNulle = test[-which(test$MeanClaimAmount == 0),]
+preds2 = predict(adOpt.Claim2, newdata = test_NonNulle)
+mc_1 = table(test_NonNulle$MeanClaimAmount,preds2)
+mc1_1 = as.data.frame(cbind(test_NonNulle$MeanClaimAmount,preds2))
+View(mc1_1)
+mc_1
+
+summary(test_NonNulle$MeanClaimAmount)
+summary(preds)
+# Erreur quadratique moyenne de prévision
+sum((preds2-test_NonNulle$MeanClaimAmount)^2)/nrow(test_NonNulle) #3160889
 
 
-#j'élague l'arbre avec le paramètre de complexité qui m'amène la plus petite xstd
-prune(arbre, cp = 0.0128637) %>% rpart.plot()
+### ----------------- MODELE FREQUENCE
+
+ad.freq = rpart(ClaimNb ~ Area + VehPower + VehAge + DrivAge + BonusMalus + VehBrand + VehGas + Region + Density
+                , data = train
+                , weights = Exposure
+                , control = rpart.control(cp=0))# trop long sans minbucket
+prp(ad.freq,extra=1,type=2, branch = 1,cex=0.5, Margin=0 ) 
+
+ad.freq2 = rpart(ClaimNb ~ Area + VehPower + VehAge + DrivAge + BonusMalus + VehBrand + VehGas + Region + Density
+                 , data = train
+                 , weights = Exposure
+                 , control = rpart.control( minbucket = 2000, cp = 0)) 
+summary(ad.freq2)
+
+## SORTIES GRAPHIQUES
+plotcp(ad.freq2)	
+printcp(ad.freq2)
+prp(ad.freq2, uniform = TRUE, extra = 0, type = 2, branch = 0, cex = 0.7, Margin = 0, compress = TRUE, ycompress = TRUE)
+
+## SIMPLIFICATION DE L'ARBRE
+# Recuperation du cp minimisant 
+adOpt.freq2 = prune(ad.freq2,cp=ad.freq2$cptable[which.min(ad.freq2$cptable[,4]),1]) 
+# cp = 4.569855e-05
+
+# Representation de l'arbre obtenu
+par(mfrow = c(1, 1), mar = c(1, 1, 1, 1))
+plot(adOpt.freq2, uniform = T, compress = T, margin = 0.1, branch = 0.3)
+text(adOpt.freq2, use.n = T, digits = 3, cex = 0.6)
+prp(adOpt.freq2, uniform = TRUE, extra = 0, type = 1, branch = 0, cex = 0.7, Margin = 0, compress = TRUE)
+
+## PREVISIONS
+# Sur l'echantillon de TRAIN
+preds_freq = predict(adOpt.freq2)
+mc_freq = table(train$ClaimNb,preds_freq)
+mc1_freq = as.data.frame(cbind(train$ClaimNb,preds_freq))
+mc_freq
+View(mc1_freq)
+
+summary(train$ClaimNb)
+summary(preds_freq)
+# Erreur quadratique moyenne de prévision
+sum((preds_freq - train$ClaimNb)^2)/nrow(train)
+
+
+# Calcul des prévisions sur 
+# Sur l'echantillon TEST
+preds2_freq = predict(adOpt.freq2, newdata = test)
+mc_1_freq = table(test$ClaimNb,preds2_freq)
+mc1_1_freq = as.data.frame(cbind(test$ClaimNb, preds2_freq))
+mc_1_freq
+View(mc1_1_freq)
+
+summary(test$ClaimNb)
+summary(preds2_freq)
+# Erreur quadratique moyenne de prévision
+sum((preds2_freq - test$ClaimNb)^2)/nrow(test)
+
 
 
 #######################################################################################################
@@ -658,7 +773,7 @@ PP_NN=mean(prd_rn)* mean(freq_pred)
 # save(list = c("train", "valid", "test")
 #      , file = "./data/train&valid&test.RData")
 
-
+load("./data/train&valid&test.RData")
 #####################################
 ###########_________   Modèle de cout
 #####################################
@@ -835,11 +950,20 @@ plot(x = mod.graphe$evaluation_log$iter
      , col = "red"
      , xlab = "Nombres d'arbres"
      , ylab = "RMSE"
-     , ylim = c(1650,2300))
+     ,xlim = c(0,1000)
+     , ylim = c(1650,2300)
+     , main = "Variation du RMSE en fonction du nombre d'arbres"
+)
 
 lines(x = mod.graphe$evaluation_log$iter
       , y = mod.graphe$evaluation_log$train_rmse
       , col = "blue")
+
+legend("topright"
+       , legend=c("Sur base de validation", "Sur base d'entrainement")
+       ,col=c("red", "blue")
+       , cex=1
+       , lty=1:1)
 
 #On affiche à partir de quand on commence l'overfitting
 # abline(h = xgb.train.2$results$RMSE[which(xgb.train.2$results$nrounds == xgb.train.2$bestTune$nrounds)], col = "red")
@@ -1180,36 +1304,3 @@ xgb.save(mod.freq.xgb, fname = "./xgboost/mod.freq.xgb.xgboost")
 test$ClaimNb %>% mean()
 train.freq$data$ClaimAnnualNb[which(train.freq$data$ClaimAnnualNb<10)]%>%summary()
 
-                                         
-                                         
-# CONCLUSION 
-
-#Modèles gagnants
-
-load("data/rf_final_cout_predictions.rda")
-load("data/rf_freq_final_expo_as_exp.rda")
-load("data/trainandtest.rda")
-
-test$ClaimNb <- as.numeric(test$ClaimNb)
-
-predictions_cout <- predictions_model_cout_final[[2]]
-predictions_freq <- predict(rf_freq_final_expo_as_exp, test)
-
-test$predictoin_cout <- predictions_cout
-test$predictoin_freq <- predictions_freq
-
-test$cout_x_freq <- test$predictoin_cout * test$predictoin_freq
-
-individus <- rbind(
-  test[test$Density > 2000 & test$MeanClaimAmount > 0 & test$BonusMalus > 50, ][1,],
-  test[test$Density < 100 & test$MeanClaimAmount > 0 & test$BonusMalus > 50, ][5,],
-  test[test$Exposure > 0.9 & test$MeanClaimAmount > 0 & test$BonusMalus > 50,][30,],
-  test[test$VehPower  == 13 & test$MeanClaimAmount > 0 & test$BonusMalus > 50,][1,],
-  test[test$VehPower == 5,][1,],
-  test[test$VehAge == 0,][76, ],
-  test[test$BonusMalus == 230,][1,],
-  test[test$BonusMalus > 150,][5,],
-  test[test$DrivAge == 18& test$MeanClaimAmount > 0,][1,],
-  test[test$DrivAge == 100& test$MeanClaimAmount > 0,][1,]
-)                                         
-                                       
