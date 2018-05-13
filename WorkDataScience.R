@@ -644,7 +644,7 @@ train.fit$bestTune # Size 4 et Decay 2 ( Le modèle choisi a le plus petit RMSE)
 nnet=tune.nnet(MeanClaimAmount~DrivAge+VehAge+VehPower+VehBrand+VehGas+BonusMalus+Area+Region+Density,data = echantillon.cout, size=seq(1,7), decay=seq(1,5), maxit=500,linout=TRUE)
 
 nnet=tune.nnet(varb,data = echantillon.cout, size=seq(1,7), decay=seq(1,5), maxit=500,linout=TRUE)
-
+#Nous reprenons les mêmes démrches que précédémment et nous  appliquons le nnet aux 3 variables explicatives les plus importantes  trouvées dans la partie Boosting cout
 plot(nnet)
 
 cout_rn = nnet(MeanClaimAmount~DrivAge+VehAge+VehPower+VehBrand+VehGas+BonusMalus+Area+Region+Density,data =train.cout, size=4, decay=2, maxit=500, linout=TRUE)
@@ -730,7 +730,7 @@ freq_optim = nnet(ClaimNb ~ DrivAge+VehAge+VehPower+VehBrand+VehGas+BonusMalus+A
                data = train, weights = train$Exposure, size=2, decay=1, maxit=100,linout=TRUE)
 
 freq_optim = nnet(varb_f, data = train, weights = train$Exposure, size=2, decay=1, maxit=500,linout=TRUE)
-
+#Nous reprenons les mêmes démrches que précédémment et nous  appliquons le nnet aux 3 variables explicatives les plus importantes  trouvées dans la partie Boosting fréquence
 summary(freq_optim)
 
 
