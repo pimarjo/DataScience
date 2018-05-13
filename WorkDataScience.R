@@ -16,13 +16,15 @@ library(Matrix)
 
 
 #LOADING DES JEUX DENTRAINEMENT ET DE TESTS
+data("freMTPL2freq")
+data("freMTPL2sev")
 load("./data/train&valid&test.RData")
 head(test)
 head(valid)
 head(train)
 
 
-nrow(merge(test, valid, by = "IDpol"))
+
 
 
 #Mise en forme des donnéees ----
@@ -415,6 +417,8 @@ train.cout.xgb <<- xgb.DMatrix(data = cbind(predict(dummyVars(data=train.cout$da
 )
 , label = train.cout$label)
 
+save.xgb
+
 valid.cout.xgb <<- xgb.DMatrix(data = cbind(predict(dummyVars(data=valid.cout$data,formula = "~Area"), newdata = valid.cout$data)
                                             , predict(dummyVars(data=valid.cout$data,formula = "~VehPower"), newdata = valid.cout$data)
                                             , VehAge = valid.cout$data$VehAge
@@ -526,6 +530,12 @@ mod.cout.xgb <- xgb.train(data = train.cout.xgb
 # On l'enregistre
 xgb.save(mod.cout.xgb, fname = "./xgboost/mode.cout.xgb.xgboost")
 
+
+imp <- xgb.importance(c("VehGas", "Density", "Region", "VehBrand", "VehPower", "DrivAge", "Area", "BonusMalus", "VehAge")
+                      , model = mod.cout.xgb)
+
+barplot(imp$Gain, names.arg = imp$Feature, col = "blue", main = "Importance des variables explicatives dans le modèle", ylab = "%")
+
 mod.graphe <- xgb.train(data = train.cout.xgb
                         , nrounds = 1000 #à renseigner
                         , max_depth = 3
@@ -535,26 +545,27 @@ mod.graphe <- xgb.train(data = train.cout.xgb
                         , min_child_weight = 0.8
                         , subsample = 0.8
                         , watchlist = watchlist
-                        , early_stopping_rounds = 10
+                        , verbose = T
 )
 
+xgb.save(mod.graphe, fname = "./xgboost/mod.graphe.xgboost")
 #On affiche l'évolution du RMSE en fonction du nombre d'arbres
 
-plot(x = mod.cout$evaluation_log$iter
-     , y = mod.cout$evaluation_log$valid_rmse
+plot(x = mod.graphe$evaluation_log$iter
+     , y = mod.graphe$evaluation_log$valid_rmse
      , type = "l"
      , col = "red"
      , xlab = "Nombres d'arbres"
      , ylab = "RMSE"
      , ylim = c(1650,2300))
 
-lines(x = mod.cout$evaluation_log$iter
-      , y = mod.cout$evaluation_log$train_rmse
+lines(x = mod.graphe$evaluation_log$iter
+      , y = mod.graphe$evaluation_log$train_rmse
       , col = "blue")
 
 #On affiche à partir de quand on commence l'overfitting
 # abline(h = xgb.train.2$results$RMSE[which(xgb.train.2$results$nrounds == xgb.train.2$bestTune$nrounds)], col = "red")
-abline(v=xgb.train.2$bestTune$nrounds, col = "red")
+abline(v=386)
 
 
 # #on peut s'amuser à grapher d'autres sensibilités
@@ -639,6 +650,11 @@ test.cout$label %>% mean()
 
 (pred.cout - test.cout$label)^2 %>% mean() %>% sqrt() -> xgb.test.cout.RMSE 
 
+xgb.importance(c("VehGas", "Density", "Region", "VehBrand", "VehPower", "DrivAge", "Area", "BonusMalus", "VehAge")
+               , model = mod.cout.xgb
+)
+
+
 
 #####################################
 ###########_________   Modèle de fréquence
@@ -661,7 +677,7 @@ test.freq <- list(data = test[which(test$AnnualClaimNb<=10),]
 
 
 
-train.freq.xgb = xgb.DMatrix(data = as.matrix(cbind(predict(dummyVars(data=train.freq$data,formula = "~Area"), newdata = train.freq$data)
+train.freq.xgb <- xgb.DMatrix(data = as.matrix(cbind(predict(dummyVars(data=train.freq$data,formula = "~Area"), newdata = train.freq$data)
                                                  , predict(dummyVars(data=train.freq$data,formula = "~VehPower"), newdata = train.freq$data)
                                                  , VehAge = train.freq$data$VehAge
                                                  , DrivAge = train.freq$data$DrivAge
@@ -673,7 +689,7 @@ train.freq.xgb = xgb.DMatrix(data = as.matrix(cbind(predict(dummyVars(data=train
                              , label = train.freq$label)
 
 
-valid.freq.xgb = xgb.DMatrix(data = as.matrix(cbind(predict(dummyVars(data=valid.freq$data,formula = "~Area"), newdata = valid.freq$data)
+valid.freq.xgb <- xgb.DMatrix(data = as.matrix(cbind(predict(dummyVars(data=valid.freq$data,formula = "~Area"), newdata = valid.freq$data)
                                                     , predict(dummyVars(data=valid.freq$data,formula = "~VehPower"), newdata = valid.freq$data)
                                                     , VehAge = valid.freq$data$VehAge
                                                     , DrivAge = valid.freq$data$DrivAge
@@ -684,7 +700,7 @@ valid.freq.xgb = xgb.DMatrix(data = as.matrix(cbind(predict(dummyVars(data=valid
                                                     , predict(dummyVars(data=valid.freq$data,formula = "~Region"), newdata = valid.freq$data)))
                              , label = valid.freq$label)
 
-test.freq.xgb = xgb.DMatrix(data = as.matrix(cbind(predict(dummyVars(data=test.freq$data,formula = "~Area"), newdata = test.freq$data)
+test.freq.xgb <- xgb.DMatrix(data = as.matrix(cbind(predict(dummyVars(data=test.freq$data,formula = "~Area"), newdata = test.freq$data)
                                                     , predict(dummyVars(data=test.freq$data,formula = "~VehPower"), newdata = test.freq$data)
                                                     , VehAge = test.freq$data$VehAge
                                                     , DrivAge = test.freq$data$DrivAge

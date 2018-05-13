@@ -5,11 +5,11 @@ date: "9 avril 2018"
 output:
   html_document:
     df_print: paged
-  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
 ```
 
 <!-- ![](images/logoisfa.jpg)  -->
@@ -107,19 +107,139 @@ Même si chaque arbre sur-interprête, mais les forêts étonnament ne le font p
 mtry ; si nous le limitons, c'est pour minimiser la correlation entre les arbres de la forêts
 
 # IV. Gradiant boosting machine
-     A. Préparation des données
+
+```{r data, visible = FALSE, echo = FALSE}
+library(caret)
+library(xgboost)
+library(dplyr)
+load("./data/train&valid&test.RData")
+train.cout <- list(data = train[which(train$ClaimNb>0),]
+                   , label = train$MeanClaimAmount[which(train$ClaimNb>0)]
+)
+
+valid.cout <- list(data = valid[which(valid$ClaimNb>0),]
+                   , label = valid$MeanClaimAmount[which(valid$ClaimNb>0)]
+)
+
+
+train.cout.xgb <<- xgb.DMatrix(data = cbind(predict(dummyVars(data=train.cout$data,formula = "~Area"), newdata = train.cout$data)
+                                            , predict(dummyVars(data=train.cout$data,formula = "~VehPower"), newdata = train.cout$data)
+                                            , VehAge = train.cout$data$VehAge
+                                            , DrivAge = train.cout$data$DrivAge
+                                            , BonusMalus = train.cout$data$BonusMalus
+                                            , predict(dummyVars(data=train.cout$data,formula = "~VehBrand"), newdata = train.cout$data)
+                                            , predict(dummyVars(data=train.cout$data,formula = "~VehGas"), newdata = train.cout$data)
+                                            , Density = train.cout$data$Density
+                                            , predict(dummyVars(data=train.cout$data,formula = "~Region"), newdata = train.cout$data)
+)
+, label = train.cout$label)
+
+valid.cout.xgb <<- xgb.DMatrix(data = cbind(predict(dummyVars(data=valid.cout$data,formula = "~Area"), newdata = valid.cout$data)
+                                            , predict(dummyVars(data=valid.cout$data,formula = "~VehPower"), newdata = valid.cout$data)
+                                            , VehAge = valid.cout$data$VehAge
+                                            , DrivAge = valid.cout$data$DrivAge
+                                            , BonusMalus = valid.cout$data$BonusMalus
+                                            , predict(dummyVars(data=valid.cout$data,formula = "~VehBrand"), newdata = valid.cout$data)
+                                            , predict(dummyVars(data=valid.cout$data,formula = "~VehGas"), newdata = valid.cout$data)
+                                            , Density = valid.cout$data$Density
+                                            , predict(dummyVars(data=valid.cout$data,formula = "~Region"), newdata = valid.cout$data)
+)
+, label = valid.cout$label)
+
+
+
+
+
+
+train.freq <- list(data = train[which(train$AnnualClaimNb<=10),]
+                   , label = train$AnnualClaimNb[which(train$AnnualClaimNb<=10)]
+)
+
+valid.freq <- list(data = valid[which(valid$AnnualClaimNb<=10),]
+                   , label = valid$AnnualClaimNb[which(valid$AnnualClaimNb<=10)]
+)
+
+
+
+train.freq.xgb = xgb.DMatrix(data = as.matrix(cbind(predict(dummyVars(data=train.freq$data,formula = "~Area"), newdata = train.freq$data)
+                                                    , predict(dummyVars(data=train.freq$data,formula = "~VehPower"), newdata = train.freq$data)
+                                                    , VehAge = train.freq$data$VehAge
+                                                    , DrivAge = train.freq$data$DrivAge
+                                                    , BonusMalus = train.freq$data$BonusMalus
+                                                    , predict(dummyVars(data=train.freq$data,formula = "~VehBrand"), newdata = train.freq$data)
+                                                    , predict(dummyVars(data=train.freq$data,formula = "~VehGas"), newdata = train.freq$data)
+                                                    , Density = train.freq$data$Density
+                                                    , predict(dummyVars(data=train.freq$data,formula = "~Region"), newdata = train.freq$data)))
+                             , label = train.freq$label)
+
+
+valid.freq.xgb = xgb.DMatrix(data = as.matrix(cbind(predict(dummyVars(data=valid.freq$data,formula = "~Area"), newdata = valid.freq$data)
+                                                    , predict(dummyVars(data=valid.freq$data,formula = "~VehPower"), newdata = valid.freq$data)
+                                                    , VehAge = valid.freq$data$VehAge
+                                                    , DrivAge = valid.freq$data$DrivAge
+                                                    , BonusMalus = valid.freq$data$BonusMalus
+                                                    , predict(dummyVars(data=valid.freq$data,formula = "~VehBrand"), newdata = valid.freq$data)
+                                                    , predict(dummyVars(data=valid.freq$data,formula = "~VehGas"), newdata = valid.freq$data)
+                                                    , Density = valid.freq$data$Density
+                                                    , predict(dummyVars(data=valid.freq$data,formula = "~Region"), newdata = valid.freq$data)))
+                             , label = valid.freq$label)
+
+
+load("./data/trainandtest.rda")
+test <- cbind(test, AnnualClaimNb = test$ClaimNb/test$Exposure)
+test.cout <- list(data = test[which(test$ClaimNb>0),]
+                  , label = test$AnnualClaimNb[which(test$ClaimNb>0)])
+
+
+test.cout.xgb <- xgb.DMatrix(data = cbind(predict(dummyVars(data=test.cout$data,formula = "~Area"), newdata = test.cout$data)
+                                           , predict(dummyVars(data=test.cout$data,formula = "~VehPower"), newdata = test.cout$data)
+                                           , VehAge = test.cout$data$VehAge
+                                           , DrivAge = test.cout$data$DrivAge
+                                           , BonusMalus = test.cout$data$BonusMalus
+                                           , predict(dummyVars(data=test.cout$data,formula = "~VehBrand"), newdata = test.cout$data)
+                                           , predict(dummyVars(data=test.cout$data,formula = "~VehGas"), newdata = test.cout$data)
+                                           , Density = test.cout$data$Density
+                                           , predict(dummyVars(data=test.cout$data,formula = "~Region"), newdata = test.cout$data)
+)
+, label = test.cout$label)
+
+test.freq <- list(data = test[which(test$AnnualClaimNb<=10),]
+                  , label = test$AnnualClaimNb[which(test$AnnualClaimNb<=10)]
+)
+
+
+test.freq.xgb = xgb.DMatrix(data = as.matrix(cbind(predict(dummyVars(data=test.freq$data,formula = "~Area"), newdata = test.freq$data)
+                                                   , predict(dummyVars(data=test.freq$data,formula = "~VehPower"), newdata = test.freq$data)
+                                                   , VehAge = test.freq$data$VehAge
+                                                   , DrivAge = test.freq$data$DrivAge
+                                                   , BonusMalus = test.freq$data$BonusMalus
+                                                   , predict(dummyVars(data=test.freq$data,formula = "~VehBrand"), newdata = test.freq$data)
+                                                   , predict(dummyVars(data=test.freq$data,formula = "~VehGas"), newdata = test.freq$data)
+                                                   , Density = test.freq$data$Density
+                                                   , predict(dummyVars(data=test.freq$data,formula = "~Region"), newdata = test.freq$data)))
+                            , label = test.freq$label)
+
+
+mod.cout.xgb <- xgb.load("./xgboost/mode.cout.xgb.xgboost")
+mod.freq.xgb <- xgb.load("./xgboost/mod.freq.xgb.xgboost")
+
+
+```
+
+
+A. Préparation des données
 Dans cette partie nous décrivons succintement les résultats obtenus par une modélisation GBM avec arbres de régression. Nous procédons à une décomposition fréquence coût moyen. Dans toute cette partie, nous utiliserons le package "xgboost", qui implémente de façon plus efficiente le GBM que le package "gbm".
 
 Sans entrer dans les détails techniques, nous listons ici les différents problèmes rencontrés dans la mise en forme des données pour le package xgboost.
- 
+
 1. La fonction de fit ne prend en entrée que des variables numériques (c'est classique en machine learning): nous utilisons le package "caret" pour créer des flags de nos variables catégorielles.
 2. Pour utiliser la fonction la plus complète du package pour l'entrainement (xgb.train), nous devons passer les données en entrée au format xgb.DMatrix
-2. Pour la modélisation de la fréquence, où la base utilisée est déjà très volumineuse, créer des flags de variables catégorielles avec relativement beaucoup de modalités pose des problèmes de stockage (en effet, nos pc ne sont pas des machines de guerre):
-    1.1. Une des fonctions, xgboost, permet de passer en paramètre des sparse Matrix, mais la fonction est moins complète au niveau du contrôle des paramètres de tuning.
-    1.2. Nous créons sur une machine puissante les flags, et nos enregistrons les données au format xgb.DMatrix en dur. 
-
-     B. Modèle de coût
-
+3. Pour la modélisation de la fréquence, où la base utilisée est déjà très volumineuse, créer des flags de variables catégorielles avec relativement beaucoup de modalités pose des problèmes de stockage (en effet, nos pc ne sont pas des machines de guerre):
+    3.1. Une des fonctions, xgboost, permet de passer en paramètre des sparse Matrix, mais la fonction est moins complète au niveau du contrôle des paramètres de tuning.
+    3.2. Nous créons sur une machine puissante les flags, et nos enregistrons les données au format xgb.DMatrix en dur. 
+                                                                       
+B. Modèle de coût
+                                                                       
 On optimise les paramètres de tuning avec une grid search à l'aide du package caret: on fixe un petit nombre d'arbres (10) pour entrainemer les modèles et on cherche les paramètre optimaux à l'aide d'une cross validation. On utilise le RMSE comme critère de choix de modèle.
 On identifie des paramètres important pour éviter l'overfitting: min_child_weight, subsample, col_sample.
 Le RMSE semble être plus sensibles aux paramètres max_depth (la profondeur maximale des arbres), nround (le nombre d'arbre).
@@ -127,26 +247,92 @@ Le temps de calcul est très sensible aux paramètres max_depth et nrounds. En o
 
 Nos paramètres optimaux sont:
 
+  Nous cherchons maintenantle nombre otpimal d'arbres. Nous obtenons 386 arbres. \p
+Voici une représentation graphique du RMSE en fonction du nombre d'abres:
+  
+  
+  
+  Nous pouvons également nous intéresser à l'influence respective de chaque variable explicative:
 
-Voici quelques graphiques illustrant ces sensibilités à partir de nos paramètres de tuning optimaux
+``` {r imp.cout, echo = FALSE}
+
+imp <- xgb.importance(c("VehGas", "Density", "Region", "VehBrand", "VehPower", "DrivAge", "Area", "BonusMalus", "VehAge")
+, model = mod.cout.xgb)
+
+barplot(imp$Gain, names.arg = imp$Feature, col = "blue", main = "Importance des variables explicatives dans le modèle", ylab = "%")
+
+```
+
+Arrive en tête la variable BonusMalus suive de très près par la variable VehAge. \p
+Le biais que présente notre modèle d'environ :
+
+```{r predict.cout.biais, echo = FALSE} 
 
 
-Nous cherchons maintenantle nombre otpimal d'arbres. Nous obtenons:
-Et voici une représentation graphique du RMSE en fonction du nombre d'abres:
+pred.cout <- predict(mod.cout.xgb, test.cout.xgb)
+mean(pred.cout) - mean(test.cout$label)
+(pred.cout - test.cout$label)^2 %>% mean() %>% sqrt() -> xgb.test.cout.RMSE 
+
+
+```
+Cela signifie que l'on surestime en moyenne le montant des sinistres.
+
+Le RMSE sur la base de test est:
+
+```{r predict.cout.rmse, echo = FALSE} 
+
+
+pred.cout <- predict(mod.cout.xgb, test.cout.xgb)
+mean(pred.cout) - mean(test.cout$label)
+(pred.cout - test.cout$label)^2 %>% mean() %>% sqrt() -> xgb.test.cout.RMSE 
+
+
+```
 
 
 
-Nous pouvons également nous intéresser à l'influence respective de chaque variable explicative:
+Le test de notre modèle sur la base de test révèle que notre modèle possède un biais de plusieurs dizaines, à la baisse. Cela signifie que nous sous-estimons les montants des sinistres attritionnels.
 
 
-Le test de notre modèle sur la base de test révèle que notre modèle possède un biais de plusieur dizaines, à la baisse. Cela signifie que nous sous-estimons les montants des sinistres attritionnels.
+C. Modèle de fréquence
+
+Nous devons prendre en compte l'exposition. Nous définissons la variable à expliquer comme le nombre annuel de sinistres. Nous divisons donc le nombre de sinistres par l'exposition pour chaque police et nous pondérons également les observations par l'exposition.
+
+Nous ne cherchons pas en profondeur les paramètres optimaux. Nous retenons les paramètres de tuning suivants à la main en parcourant une courte grille de paramètres. Nous ne parvenons pas à utiliser le package caret pour cette tâche. Nous avons donc créé une petite fonction pour palier à ça. Nous calcul simplement le RMSE sur la base de validation pour choisir les paramètres.
 
 
-  C. Modèle de fréquence
+On évalue ensuite l'influence des différentes variables explicatives.
+``` {r imp.freq, echo = FALSE}
 
-Nous devons prendre en compte l'exposition. Nous définissons la variable à expliquer comme le nombre annuel de sinistres. Nous divisons donc le nombre de sinistres par l'exposition pour chaque police, nous multiplierons la prediction par l'exposition. Nous pondérons également les observations par l'exposition.
+imp <- xgb.importance(c("VehGas", "Density", "Region", "VehBrand", "VehPower", "DrivAge", "Area", "BonusMalus", "VehAge")
+, model = mod.freq.xgb)
 
-Nous ne cherchons pas en profondeur les paramètres optimaux. Nous retenons les paramètres de tuning suivants:
+barplot(imp$Gain, names.arg = imp$Feature, col = "blue", main = "Importance des variables explicatives dans le modèle", ylab = "%", las = 2)
+
+```
+
+Les variables arrivant en tête sont BonusMalus et VehAge.
+
+Notre modèle présente également un biais de:
+```{r predict.freq.biais, echo = FALSE} 
+
+
+pred.freq <- predict(mod.freq.xgb, test.freq.xgb)
+mean(pred.freq) - mean(test.freq$label)
+
+(pred.freq - test.freq$label)^2 %>% mean() %>% sqrt() -> xgb.test.freq.RMSE 
+
+
+
+```
+Cela signifie que l'on sous-estime très légèrement en moyenne notre fréquence de sinistres.
+
+Le RMSE sur la base de test est de:
+```{r predict.freq.RMSE, echo = FALSE} 
+
+(pred.freq - test.freq$label)^2 %>% mean() %>% sqrt() 
+
+```
 
 Les tests sur la base de test révèlent que notre modèle est également biaisé. 
 
