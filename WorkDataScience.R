@@ -184,15 +184,18 @@ sample3=sample(1:dim(train)[1], ceiling(0.4*dim(train)[1]), replace = FALSE)
 echantillon=train[sample3,]
 
 nrow(echantillon)
-
-################################# Réseau de Neurones########################################
-
+summary(echantillon)
+summary(train)
 #1  Coût
 
 train.cout <- train[-which(train$MeanClaimAmount == 0),]
+
 test.cout <- test[-which(test$MeanClaimAmount == 0),]
-echantillon.cout<-echantillon[-which(echantillon$MeanClaimAmount == 0),] #6839
+
+echantillon.cout<-echantillon[-which(echantillon$MeanClaimAmount == 0),] 
+
 summary(echantillon.cout$MeanClaimAmount)
+
 summary(train.cout$MeanClaimAmount)
 
 # Dans cet algo, on cherchera  à déterminer l'élément  le plus important:le nombre de neurones sur la couche cachée parallèlement aux conditions d'apprentissage (temps ou nombre de boucles) 
