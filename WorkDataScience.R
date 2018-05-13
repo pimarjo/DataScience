@@ -722,7 +722,7 @@ View(cbind(test.freq$data, test.freq$label, pred))
 
 
 pred %>% mean()
-<<<<<<< HEAD
+
 test.freq$label %>% mean()
 
 (pred - test.freq$label)^2 %>% mean() %>% sqrt()
@@ -882,7 +882,7 @@ test.freq$label %>% mean()
 
 
 xgb.save(mod.freq.xgb, fname = "./xgboost/mod.freq.xgb.xgboost")
-=======
+
 test$ClaimNb %>% mean()
 train.freq$data$ClaimAnnualNb[which(train.freq$data$ClaimAnnualNb<10)]%>%summary()
->>>>>>> c58bfdf7b67314d3ef0abdaa176481774ac0d3d5
+

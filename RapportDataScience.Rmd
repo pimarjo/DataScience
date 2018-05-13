@@ -1,6 +1,6 @@
 ---
 title: "Rapport Data Science"
-author: "Afaf JESS, Mehdi KHAIROUN, William LAURENT, Pierre MARJOLLET"
+author: "Mehdi KHAIROUN, William LAURENT, Pierre MARJOLLET, Afaf TABAMMOUT"
 date: "9 avril 2018"
 output:
   html_document:
