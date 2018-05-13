@@ -6,12 +6,8 @@ output:
   html_document:
     df_print: paged
   pdf_document: default
-  word_document: default
 ---
-<style>
-body {
-text-align: justify}
-</style>
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -46,7 +42,17 @@ Enfin, **freMTPLsev** est une base sévèrité, avec simplement un identifiant e
 * **IDpol** [Entier de 139 à 6113971] : l'identifiant de la police d'assurance
 * **ClaimAmount** [Réel de 1 à 4 075 401] : coût du sinistre
 
+## 2. Pré-processing
 
+Nous avons calculé la moyenne des coûts des sinistres par polices sur la base **freMTPLsev**. Le but étant de savoir quelle est la moyenne des sinistres d'une police.
+
+Nous avons ensuite fusionné les bases **freMTPLsev** et **freMTPLfreq** par **IDpol** maintenant unique sur les deux bases.
+
+Il vient ensuite une base sur laquelle nous retirons les sinistres graves (ceux supérieures à $20 000$). Ce seuil a été déterminé rapidement par l'étude d'un mean-excess plot. Ces quelques sinistres biaisais fortement nos modélisations et seront répartie comme une sur-prime sur l'ensemble de nos assurés.
+
+Nous basons nos modélisations sur seulement $70%$ de nos données pour se laisser une bonne marge de test. Ensuite, pour les procédures plus lourde (typiquement le gradian boosting et les réseaux de neuronnes) les derniers modèles retenus ont été entraîner sur un sous jeux de cette base d'entraînement.
+
+Pour les modélisations en sévérité, nous avons biensûre enlevé les polices ne présentant aucun sinistre.
 
 ## 3. R et ses extentions
 
@@ -55,7 +61,7 @@ Dans ce projet nous utilisons le logiciel opensource R et nous utilisons son ext
 Pour pouvoir mener à bien ce projet, nous avons munit R des librairies suivantes :
 
 * **caret** : **C**lassification **a**nd **re**gression **t**raining, utilisé ici pour utiliser nos algorithmes aisément sur des grilles de paramètre de tuning. Propose également une parrallélisation de ses algorithmes. **caret** dispose de tous les algorithmes nécessaire au bon déroulement de ce projet et pourrait nous suffire ici.
-* **doParallel** : s'accouple à **caret** pour accéder à la parrallélisation des algorithmes.
+* **doParallel** : s'accouple à **caret** pour accéder à la parrallélisation des algorithmes et ainsi économiser quelques précieuses heures de run.
 * **rpart** : permets de dresser des arbres (ici des arbres de régressions).
 * **rpart.plot** : utilisé ici pour afficher des graph d'arbres de régressions.
 * **magrittr** : donner au code plus de lisibilité.
@@ -73,7 +79,11 @@ La méthode de random forest que nous allons exploiter ici est celle qui consist
 
 * **Pour des petites valeurs** : les noeuds disposerons que de peu de variable pour se former, l'arbre peu être unitairement pauvre en puissance prédictive mais la correlation entre les arbres est minimisée.
 * **Pour des grandes valeurs** : les noeuds disposerons de beaucoup de variable pour se former, l'arbre peu être riche en puissance prédictive (comme un CART maximal) mais la correlation entre les arbres sera forte
-* Ainsi, $mtry$ sera déterminé par grille de paramêtres.
+* Ainsi,un $mtry$ sera déterminé par grille de paramêtres.
+
+## 2. Modèlisation du coût moyen
+
+Nous avons fais tourner une 
 
 ```{r plot, echo = FALSE, fig.height=7, fig.width=10}
 
@@ -88,7 +98,7 @@ plot(
   )
 
 ```
-Sur ce graph on trouve que la région des bons $mtry$ se trouve entre $10$ et $20$. Dans la pratique, pour un problème de régression, randomForest conseillera de prendre la racine du nombre de variable, c'est un peu plus chez nous parce que beaucoup de nos variables sont binaires et donc porte moins d'information que la variable de base.
+Sur ce graph on trouve que la région des bons $mtry$ se trouve entre $10$ et $20$. Dans la pratique, pour un problème de régression, randomForest conseillera de prendre la racine du nombre de variable. Chez nous, il en faut un peu plus.
 
 
 
@@ -143,6 +153,21 @@ Les tests sur la base de test révèlent que notre modèle est également biais�
 
 
 # V. Réseaux de neuronnes
+
+    A. Présentation du procédé
+
+Le réseau de neurones artificiels a été inspiré du mécanisme du système nerveux humain, à travers l’histoire on a cherché à imiter son fonctionnement en commençant par le neurone formel apparu en 1943 avec une modélisation mathématique  du neurone biologique, puis par les premières règles d’apprentissage de Hebb en 1949 et de l’algorithme d’apprentissage de rétropropagation en 1986 par Rumelhart.
+
+Cet algorithme  est utilisé dans le  cadre des problématiques de classification, de reconnaissance de formes, d’association, d’extractions  de caractéristiques, d’identification…
+
+En assurance, l’avantage de cet algorithme est de pou voir capter les dépendances non linéaires entre les variables explicatives pour pouvoir affiner le tarif et appréhender le risque.
+
+Pour les parties qui suivent, le  paramètre le plus  important  qui serait à déterminer est  représenté par le nombre de neurones sur la couche cachée parallèlement aux conditions d’apprentissage que nous citerons par la suite:
+
+Pour le calibrage des deux modèles Fréquence et Coût, nous avons utilisé plusieurs fonctions  intégrées sous R:
+
+- Tune.nnet du package
+- Nnet du package
 
 # VI. Conclusion 
 

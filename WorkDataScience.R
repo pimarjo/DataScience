@@ -179,13 +179,178 @@ prune(arbre, cp = 0.0128637) %>% rpart.plot()
 #######################################################################################################
 
 
+sample3=sample(1:dim(train)[1], ceiling(0.4*dim(train)[1]), replace = FALSE)
+
+# Echantillon réduit pour un gain de temps
+
+echantillon=train[sample3,]
+
+nrow(echantillon)
+
+################################# Réseau de Neurones########################################
+
+#1  Coût
+
+train.cout <- train[-which(train$MeanClaimAmount == 0),]
+test.cout <- test[-which(test$MeanClaimAmount == 0),]
+echantillon.cout<-echantillon[-which(echantillon$MeanClaimAmount == 0),] #6839
+summary(echantillon.cout$MeanClaimAmount)
+summary(train.cout$MeanClaimAmount)
+
+# Dans cet algo, on cherchera  à déterminer l'élément  le plus important:le nombre de neurones sur la couche cachée parallèlement aux conditions d'apprentissage (temps ou nombre de boucles) 
+
+# A noter que l'alternative pour déterminer le nombre de neurones est celle du decay: paramètre de régularisation  
+
+#1-1 Régression
+
+#  Pour réduire le temps de calcul, on va  Fitter un neural network sur la base réduite ( 6839 rows): La meilleure mÃ©hotde pour dÃ©terminer le nombre de layers 
+#et le nombre de neurones
+
+n <- names(echantillon.cout)
+mygrid <- expand.grid(size=c(1,2,3,4,5,6,7),decay=seq(1,5),KEEP.OUT.ATTRS = TRUE, stringsAsFactors = TRUE)
+
+#as.formula nous permet de voir au plus clair sur les variables prise en compte pour les fit
+
+varb <- as.formula(paste(" MeanClaimAmount", paste(c("DrivAge","VehAge","VehPower","VehBrand","VehGas","BonusMalus","Area","Region","Density"), collapse = " + "),sep=" ~ "))
+
+# 1-2 Trainning net 
+
+str(echantillon.cout) # vérification des types de variables avant  la régression train
+ctrl    <- trainControl(method = "cv", 
+                        number = 10, 
+                        savePredictions = TRUE,
+                        verboseIter = T,
+                        returnResamp = "all")
+
+train.fit = train(varb ,data=echantillon.cout,method = "nnet",tuneGrid = mygrid ,trace=F, trControl =ctrl)
+
+train.fit = train(MeanClaimAmount~DrivAge+VehAge+VehPower+VehBrand+VehGas+BonusMalus+Area+Region+Density ,data=echantillon.cout,method = "nnet",tuneGrid = mygrid ,trace=F, trControl =ctrl)
+
+plot(train.fit) 
+
+train.fit$resample
+
+train.fit$bestTune # Size 4 et Decay 2 ( Le modèle choisi a le plus petit RMSE)
+
+#Nous nous contentons de 500 itérations ( maxit= 500)
+
+#Optimiser les paramètres nécessite la validation croisée. La fonction tune.nnet() de la librairie e1071 est adaptée:
+
+nnet=tune.nnet(MeanClaimAmount~DrivAge+VehAge+VehPower+VehBrand+VehGas+BonusMalus+Area+Region+Density,data = echantillon.cout, size=seq(1,7), decay=seq(1,5), maxit=500,linout=TRUE)
+
+nnet=tune.nnet(varb,data = echantillon.cout, size=seq(1,7), decay=seq(1,5), maxit=500,linout=TRUE)
+
+plot(nnet)
+
+cout_rn = nnet(MeanClaimAmount~DrivAge+VehAge+VehPower+VehBrand+VehGas+BonusMalus+Area+Region+Density,data =train.cout, size=4, decay=2, maxit=500, linout=TRUE)
+
+summary(cout_rn)
+
+plot.nnet(cout_rn)
+
+summary(cout_rn$fitted.values); summary(train.cout$MeanClaimAmount)
+
+# 1-3 Prédiction cout_rn
+
+prd_rn=predict(cout_rn,test.cout)
+
+#  Nous comparons la qualité des prédictions en observant les montants de sinistres de la predictiona avec la base  test :
+
+summary(prd_rn)
+
+summary(test.cout$MeanClaimAmount)
+ 
+#Nous avons un bon  ajustement pour la moyenne  mais nous constatons une sous-estimation du nombre maximal de sinistres  dans notre prédiction 1527 contre 19 810
 
 
+mse_c=mse(as.numeric(prd_rn), test.cout$MeanClaimAmount)
+
+rmse_c=rmse(as.numeric(prd_rn), test.cout$MeanClaimAmount)
+
+# RMSE, Erreur du modèle  ( vérification par une 2 ème méthode de calcul)
+
+RMSE_C <- sqrt(sum((prd_rn-test.cout$MeanClaimAmount)^2)/nrow(test.cout));rmse_c
 
 
+#2- Fréquence
+
+x=0.01444018
+
+sample4=sample(1:dim(train)[1], ceiling(x*dim(train)[1]), replace = FALSE)
+
+# Echantillon réduit pour un gain de temps
+
+echantillon.freq=train[sample4,]
+
+nrow(echantillon.freq)
+
+#Validation de l'échantillon
+
+summary(echantillon.freq$ClaimNb)
+summary(train$ClaimNb) #Pour la fréquence nous gardons toute la base d'apprentissage
+
+#2-1 Régression
+
+#as.formula nous permet de voir au plus clair sur les variables prise en compte pour les fit
+
+varb_f <- as.formula(paste(" ClaimNb", paste(c("DrivAge","VehAge","VehPower","VehBrand","VehGas","BonusMalus","Area","Region","Density"), collapse = " + "),sep=" ~ "))
 
 
+str(echantillon.freq) # vérification des types de variables avant  la régression train
+ 
+ctrl    <- trainControl(method = "cv", 
+                        number = 10, 
+                        savePredictions = TRUE,
+                        verboseIter = T,
+                        returnResamp = "all")
 
+echantillon.freq$ClaimNb<- as.numeric(echantillon.freq$ClaimNb)
+
+Fit_freq = train(ClaimNb ~ DrivAge+VehAge+VehPower+VehBrand+VehGas+BonusMalus+Area+Region+Density,data=echantillon.freq, method = "nnet", tuneGrid = mygrid ,trace=F, trControl =ctrl, weights=echantillon.freq$Exposure)
+
+Fit_freq = train(varb_f, method = "nnet", tuneGrid = param , trControl = ctrl, weights=echantillon.freq$Exposure)
+
+
+# Pramètres optimaux size = 2 et decay = 1 
+
+summary(Fit_freq)
+
+plot(Fit_freq)
+
+Fit_freq$bestTune
+
+# 2-2 Trainning net ( avec  l'exposition comme  pondération )
+
+freq_optim = nnet(ClaimNb ~ DrivAge+VehAge+VehPower+VehBrand+VehGas+BonusMalus+Area+Density + Region,
+               data = train, weights = train$Exposure, size=2, decay=1, maxit=100,linout=TRUE)
+
+freq_optim = nnet(varb_f, data = train, weights = train$Exposure, size=2, decay=1, maxit=500,linout=TRUE)
+
+summary(freq_optim)
+
+
+summary(freq_optim$fitted.values) ; summary(train$ClaimNb) 
+
+plot.nnet(freq_optim)
+
+# 2-3 Prédiction 
+
+freq_pred = predict(freq_optim,test,weights = test$Exposure,type="raw")
+
+summary(freq_pred) ; summary(test$ClaimNb)
+
+min(freq_pred)
+max(freq_pred)
+
+# un bon ajustement de la moyenne contre une sous-estimation du Max ( 0.23142 contre 16)!
+
+# RMSE & MSE
+
+mse_f=mse(as.numeric(freq_pred), test$ClaimNb)
+
+rmse_f=rmse(as.numeric(freq_pred), test$ClaimNb)
+
+PP_NN=mean(prd_rn)* mean(freq_pred)
 
 
 
@@ -557,6 +722,7 @@ View(cbind(test.freq$data, test.freq$label, pred))
 
 
 pred %>% mean()
+<<<<<<< HEAD
 test.freq$label %>% mean()
 
 (pred - test.freq$label)^2 %>% mean() %>% sqrt()
@@ -716,3 +882,7 @@ test.freq$label %>% mean()
 
 
 xgb.save(mod.freq.xgb, fname = "./xgboost/mod.freq.xgb.xgboost")
+=======
+test$ClaimNb %>% mean()
+train.freq$data$ClaimAnnualNb[which(train.freq$data$ClaimAnnualNb<10)]%>%summary()
+>>>>>>> c58bfdf7b67314d3ef0abdaa176481774ac0d3d5
