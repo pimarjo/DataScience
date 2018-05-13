@@ -57,7 +57,16 @@ Nous avons calculé la moyenne des coûts des sinistres par polices sur la base 
 
 Nous avons ensuite fusionné les bases **freMTPLsev** et **freMTPLfreq** par **IDpol** maintenant unique sur les deux bases.
 
-Il vient ensuite une base sur laquelle nous retirons les sinistres graves (ceux supérieures à $20 000$). Ce seuil a été déterminé rapidement par l'étude d'un mean-excess plot. Ces quelques sinistres biaisais fortement nos modélisations et seront répartie comme une sur-prime sur l'ensemble de nos assurés.
+Il vient ensuite une base sur laquelle nous retirons les sinistres graves (ceux supérieures à $20 000$). Ce seuil a été déterminé rapidement par l'étude d'un mean-excess plot. Ces quelques sinistres biaisais fortement nos modélisations et seront répartie comme une sur-prime sur l'ensemble de nos assurés. La surprime est évaluée à:
+```{r surprime, echo=FALSE}
+library(CASdatasets)
+load("./data/trainandtest.rda")
+load("./data/trainandtestgraves.rda")
+test.graves <- cbind(test.graves, ClaiAmount = test.graves$ClaimNb*test.graves$MeanClaimAmount)
+train.graves <- cbind(train.graves, ClaiAmount = train.graves$ClaimNb*train.graves$MeanClaimAmount)
+surprime <- (sum(test.graves$ClaiAmount)+sum(train.graves$ClaiAmount))/(sum(train$Exposure)+sum(test$Exposure))
+surprime
+```
 
 Nous basons nos modélisations sur seulement $70%$ de nos données pour se laisser une bonne marge de test. Ensuite, pour les procédures plus lourde (typiquement le gradian boosting et les réseaux de neuronnes) les derniers modèles retenus ont été entraîner sur un sous jeux de cette base d'entraînement.
 
@@ -423,35 +432,35 @@ Nous pouvons également nous intéresser à l'influence respective de chaque var
 imp <- xgb.importance(c("VehGas", "Density", "Region", "VehBrand", "VehPower", "DrivAge", "Area", "BonusMalus", "VehAge")
 , model = mod.cout.xgb)
 
-barplot(imp$Gain, names.arg = imp$Feature, col = "blue", main = "Importance des variables explicatives dans le modèle", ylab = "%")
+barplot(imp$Gain, names.arg = imp$Feature, col = "blue", main = "Importance des variables explicatives dans le modèle", ylab = "%", las = 2)
 
 ```
 
 Arrive en tête la variable BonusMalus suive de très près par la variable VehAge.
 
-
+Le biais que présente notre modèle d'environ
 ```{r predict.cout.biais, echo = FALSE} 
 
 
 pred.cout <- predict(mod.cout.xgb, test.cout.xgb)
-(mean(pred.cout) - mean(test.cout$label)) -> xgb.test.cout.biais
+(mean(pred.cout) - mean(test.cout$label))
 
 
 
 ```
-Le biais que présente notre modèle d'environ $xgb.test.cout.biais$
+
 
 Cela signifie que l'on surestime en moyenne le montant des sinistres.
 
 
-
+Le RMSE sur la base de test est
 ```{r predict.cout.rmse, echo = FALSE} 
 
-((pred.cout - test.cout$label)^2 %>% mean() %>% sqrt()) -> xgb.test.cout.RMSE
+((pred.cout - test.cout$label)^2 %>% mean() %>% sqrt())
 
 ```
 
-Le RMSE sur la base de test est $xgb.test.cout.RMSE$.
+
 
 Le test de notre modèle sur la base de test révèle que notre modèle possède un biais de plusieurs dizaines, à la baisse. Cela signifie que nous sous-estimons les montants des sinistres attritionnels.
 
