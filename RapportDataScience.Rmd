@@ -90,32 +90,183 @@ La méthode de random forest que nous allons exploiter ici est celle qui consist
 
 * **Pour des petites valeurs** : les noeuds disposerons que de peu de variable pour se former, l'arbre peu être unitairement pauvre en puissance prédictive mais la correlation entre les arbres est minimisée.
 * **Pour des grandes valeurs** : les noeuds disposerons de beaucoup de variable pour se former, l'arbre peu être riche en puissance prédictive (comme un CART maximal) mais la correlation entre les arbres sera forte
-* Ainsi,un $mtry$ sera déterminé par grille de paramêtres.
+* Ainsi, un $mtry$ sera déterminé par grille de paramêtres.
 
 ## 2. Modèlisation du coût moyen
 
-Nous avons fais tourner une 
+### A. Recherche de $mtry$
 
-```{r plot, echo = FALSE, fig.height=7, fig.width=10}
+Nous avons fais tourner plusieurs forêts pour obtenir un $mtry$ satisfaisant :
 
-load("data/10percentsRF.rdata")
+```{r plot rf cout mtry, echo = FALSE, fig.height=7, fig.width=10}
+
+# le modèle est trop lourd, on se contentera de la restitution des résultats
+# load("data/cout_model_rf_runing_time.rda")
+
+load("data/cout_model_rf_runing_time_results.rda")
 
 plot(
-  rf10
-  , main = "Evolution de la RMSE sur l'échantillon d'entrainement en fonction de mtry\nModèle sur la sévérité"
+  RMSE_cout_model_rf_test
+  , main = "RMSE\nModèles sur la sévérité"
   , xlab = "mtry"
   , ylab = "rmse"
-  , sub = "25 échantillons bootstrap sur 10% de la donnée, 500 arbres par forêt"
+  , col = "green"
+  , lwd = 2
+  , ylim = range(range(RMSE_cout_model_rf_test), range(RMSE_cout_model_rf_train))
+  , sub = "25 échantillons bootstrap sur 70% de la donnée, 100 arbres par forêt"
+  , type = "l"
   )
 
+lines(RMSE_cout_model_rf_train, col = "blue", lwd = 2)
+
+legend("topleft", legend=c("Sur base d'entrainement", "Sur base de test"),
+       col=c("blue", "green"), lty=1:1, cex=1)
+
 ```
-Sur ce graph on trouve que la région des bons $mtry$ se trouve entre $10$ et $20$. Dans la pratique, pour un problème de régression, randomForest conseillera de prendre la racine du nombre de variable. Chez nous, il en faut un peu plus.
+
+Sur ce graph on trouve que la région des bons $mtry$ se trouve entre $1$ et $5$. Dans la pratique, pour un problème de régression, randomForest conseillera de prendre la racine du nombre de variable (vers $6$, $7$ ici).
+
+On va refaire pousser des fôrets cette fois-ci en poussant le nombre d'arbre à $1000$ par forêt pour ensuite séléctionner un modèle final
+
+## B. Comparaison des forêts retenues
+
+Enfin,après avoir poussé le nombre d'arbre par forêts :
+
+```{r final cout graph, echo = FALSE}
+
+load("data/cout_model_rf_final_runing_time_results.rda")
+
+plot(
+  RMSE_cout_model_rf_test_final
+  , main = "RMSE\nModèles finaux sur la sévérité"
+  , xlab = "mtry"
+  , ylab = "rmse"
+  , col = "green"
+  , lwd = 2
+  , ylim = range(range(RMSE_cout_model_rf_test_final), range(RMSE_cout_model_rf_train_final))
+  , sub = "10 échantillons bootstrap sur 70% de la donnée, 1000 arbres par forêt"
+  , type = "l"
+  )
+
+lines(RMSE_cout_model_rf_train_final, col = "blue", lwd = 2)
+
+legend("center", legend=c("Sur base d'entrainement", "Sur base de test"),
+       col=c("blue", "green"), lty=1:1, cex=1)
 
 
+```
 
-Même si chaque arbre sur-interprête, mais les forêts étonnament ne le font pas. 
+```{r final cout table, echo = FALSE}
 
-mtry ; si nous le limitons, c'est pour minimiser la correlation entre les arbres de la forêts
+load("data/cout_model_rf_final_runing_time_results.rda")
+
+best_rf_model_cout <- data.frame(matrix(0, 5, 4), row.names = c("mtry = 1", "mtry = 2", "mtry = 3", "mtry = 4", "mtry = 5"))
+
+colnames(best_rf_model_cout) <- c("Proportion de donnée","RMSE entrainement", "RMSE test", "Biais test")
+
+best_rf_model_cout[,1] <- c("70%", "70%", "70%", "70%", "70%")
+best_rf_model_cout[,2] <- RMSE_cout_model_rf_train_final
+best_rf_model_cout[,3] <- RMSE_cout_model_rf_test_final
+best_rf_model_cout[,4] <- biais_cout_finaux
+
+print(best_rf_model_cout)
+
+```
+
+Et le meilleur modèle est celui avec $mtry=2$ même s'il est plutôt biaisé par rapport aux autres, la RMSE est meilleure donc on se trompe moins pour chacune des polies mais en moyenne on se trompe plus.
+
+
+## 3. Modélisation de la fréquence
+
+### A. Recherche de $mtry$
+
+Comme pour la partie précédente, nous avons tourner nos algorithme sur sur la sévérité pour obtenir une idée d'un bon $mtry$
+
+```{r comparaison foret exposure, echo = FALSE, fig.height=7, fig.width=10}
+
+load("data/1_20mtryonfreq_results.rda")
+
+plot(
+  RMSE_predictions_freq_model_rf
+  , main = "RMSE\nModèles sur la sévérité"
+  , xlab = "mtry"
+  , ylab = "rmse"
+  , col = "green"
+  , lwd = 2
+  , ylim = range(range(RMSE_predictions_freq_model_rf), range(RMSE_training_freq_model_rf))
+  , sub = "25 échantillons bootstrap sur 70% de la donnée, 100 arbres par forêt"
+  , type = "l"
+  )
+
+lines(RMSE_training_freq_model_rf, col = "blue", lwd = 2)
+
+legend("topleft", legend=c("Sur base d'entrainement", "Sur base de test"),
+       col=c("blue", "green"), lty=1:1, cex=1)
+
+```
+
+On retient alors que sur les modèles de fréquences un $mtry$ faible (moins de $5$) fera l'affaire. Nous allons quand même essayer plusieurs statégies pour améliorer nos prédictions, notamment comment exploiter la variable $Exposure$?.
+On prendra $mtry=3$ pour la séléction des meilleurs modèles.
+
+### B. Réflexion sur la variable $Exposure$
+
+Nous avons essayé trois modélisations différentes sur un petit set de donnée :
+
+* En utilisant la variable $Exposure$ comme variable explicative
+
+* En utilisant la variable $Exposure$ comme offset
+
+* En divisant $ClaimNb$ par $Exposure$
+
+Les résultats sont les suivants : 
+
+```{r comparaison foret exposure, echo = FALSE, fig.height=7, fig.width=10}
+
+load("data/rf_freq_mtry_3_ntree_500_Exposure_as_weights.rda")
+load("data/rf_freq_mtry_3_ntree_500_Exposure_devided.rda")
+load("data/rf_freq_mtry_3_ntree_500_Exposure_exp.rda")
+
+predict(rf_freq_mtry_3_ntree_500_Exposure_as_weights, test, weights = test$Exposure) -> pred_rf_freq_mtry_3_ntree_500_Exposure_as_weights
+predict(rf_freq_mtry_3_ntree_500_Exposure_devided, test) * test$Exposure -> pred_rf_freq_mtry_3_ntree_500_Exposure_devided
+predict(rf_freq_mtry_3_ntree_500_Exposure_exp, test) -> pred_rf_freq_mtry_3_ntree_500_Exposure_exp
+
+RMSE(pred = pred_rf_freq_mtry_3_ntree_500_Exposure_as_weights, test$ClaimNb) -> RMSE_1
+RMSE(pred = pred_rf_freq_mtry_3_ntree_500_Exposure_devided, test$ClaimNb) -> RMSE_2
+RMSE(pred = pred_rf_freq_mtry_3_ntree_500_Exposure_exp, test$ClaimNb) -> RMSE_3
+
+resultat <- data.frame(matrix("", 3, 2))
+colnames(resultat) <- c("Gestion de l'exposition", "RMSE sur donnée de test")
+resultat[,1] <- c("Exposition en offset", "Division par Exposition", "Exposition en explicative")
+resultat[,2] <- c(RMSE_1, RMSE_2, RMSE_3)
+
+print(resultat)
+
+```
+
+Les résultats sont légèrement meilleurs quand l'exposition est en variable explicative, ce qui est douteux. Probablement du fait que le dataset était tout petit. On va pousser la taille de l'échantillon et finir par convenir à un modèle final.
+
+### C. Modèles finaux
+
+Comparons maintenant les résultats obtenus avec les deux modèles retenus pour la fréquence
+
+```{r selection meilleur rf freq, echo = FALSE}
+
+load("data/rf_freq_final_expo_as_exp.rda")
+load("data/rf_freq_final_expo_as_weights.rda")
+
+best_rf_model_freq <- data.frame(matrix(0, 2, 4), row.names = c("Exposition comme poids", "Exposition comme variable explicative"))
+
+colnames(best_rf_model_freq) <- c("Proportion de donnée","RMSE entrainement", "RMSE test", "Biais test")
+
+best_rf_model_freq[,1] <- c("15%", "15%")
+best_rf_model_freq[,2] <- c(rf_freq_final_expo_as_weights$results$RMSE, rf_freq_final_expo_as_exp$results$RMSE)
+best_rf_model_freq[,3] <- c(RMSE(pred = predict(rf_freq_final_expo_as_weights, test, weights = test$Exposure), obs = test$ClaimNb), RMSE(pred = predict(rf_freq_final_expo_as_exp, test), obs = test$ClaimNb))
+best_rf_model_freq[,4] <- c(mean(predict(rf_freq_final_expo_as_weights)) - mean(test$ClaimNb), mean(predict(rf_freq_final_expo_as_exp)) - mean(test$ClaimNb))
+
+print(best_rf_model_freq)
+
+```
+Les deux modèles se vaux. En effet, l'un est meilleur en $RMSE$ mais est moins bien en Biais. On va préferer le modèle avec l'exposition comme offset car le biais est négatif; ainsi, on sur-estime la fréquence d'apparition des sinistres.
 
 # IV. Gradiant boosting machine
 
