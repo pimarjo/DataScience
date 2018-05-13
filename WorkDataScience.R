@@ -13,6 +13,15 @@ library(xgboost)
 library(fExtremes)
 library(gbm)
 library(Matrix)
+library(neuralnet)
+library(car)
+library(nnet)
+library(e1071)
+library("xts")
+library("sp")
+library("zoo")
+library(MASS)
+library(magrittr)
 
 
 #LOADING DES JEUX DENTRAINEMENT ET DE TESTS
