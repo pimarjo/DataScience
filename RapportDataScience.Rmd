@@ -8,8 +8,17 @@ output:
 ---
 
 ```{r setup, include=FALSE}
+library(dplyr)
+library(magrittr)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(xgboost)
+library(fExtremes)
+library(gbm)
+library(Matrix)
+load("data/trainandtest.rda")
 knitr::opts_chunk$set(echo = TRUE)
-
 ```
 
 <!-- ![](images/logoisfa.jpg)  -->
