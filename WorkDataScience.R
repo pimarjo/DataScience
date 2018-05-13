@@ -164,16 +164,291 @@ prune(arbre, cp = 0.0128637) %>% rpart.plot()
 #######################################################################################################
 ######################_________________________   Random forest
 #######################################################################################################
+# ON réécris la fonction varImpPlot de randomForest pour pouvoir l'exploiter par caret :
+
+varImpPlot <- function (x, sort = TRUE, n.var = min(30, nrow(x)), 
+                        type = NULL, class = NULL, scale = TRUE, main = "", 
+                        ...) 
+{
+  imp <- x
+  if (ncol(imp) > 2) 
+    imp <- imp[, -(1:(ncol(imp) - 2))]
+  nmeas <- ncol(imp)
+  if (nmeas > 1) {
+    op <- par(mfrow = c(1, 2), mar = c(4, 5, 4, 1), mgp = c(2, 
+                                                            0.8, 0), oma = c(0, 0, 2, 0), no.readonly = TRUE)
+    on.exit(par(op))
+  }
+  for (i in 1:nmeas) {
+    ord <- if (sort) 
+      rev(order(imp[, i], decreasing = TRUE)[1:n.var])
+    else 1:n.var
+    xmin <- if (colnames(imp)[i] %in% c("IncNodePurity", 
+                                        "MeanDecreaseGini")) 
+      0
+    else min(imp[ord, i])
+    dotchart(imp[ord, i], xlab = colnames(imp)[i], ylab = "", 
+             main = if (nmeas == 1) 
+               main
+             else NULL, xlim = c(xmin, max(imp[, i])), ...)
+  }
+  if (nmeas > 1) 
+    mtext(outer = TRUE, side = 3, text = main, cex = 1.2)
+  invisible(imp)
+}
 
 
+train.cout <- train[train$MeanClaimAmount > 0, ]
+
+# Modèles sur la sévérité : recherche du mtry optimal
+
+# AVEC GRAVES DEDANS
+
+rf10 <- train(MeanClaimAmount ~ Area + VehPower + VehAge + 
+                        DrivAge + BonusMalus + VehBrand + VehGas + Region + est_grave, 
+                      data = train.cout[1:1720,], 
+                      method = "rf", 
+                      tuneGrid = expand.grid(.mtry = 1:50),
+                      trControl = trainControl(number = 10, method = "repeatedcv")
+                      )
+
+# A ce moment là de notre code, on gardait la variable "est_grave" et nous concervons les sinistres graves
+# Nous l'avons laissé tombé pour se concentrer uniquement sur les sinistres attritionnels
+# Ainsi, on supposeras que le mtry est toujours le bon.
+
+# On relance rf10 sans la variable est_grave pour regarder l'impacte sur le mtry optimal
+
+# SANS GRAVE, AVEC TOUTE LA DONNEE
+
+# Construction de "data/cout_model_rf_runing_time.rda"
 
 
+train$ClaimNb <- as.numeric(train$ClaimNb)
 
 
+DEPART <- Sys.time()
+
+runing_time <- c(DEPART)
+
+cout_model_rf <- lapply(1:30, function(mymtry)
+{
+  rf_model <- train(
+    MeanClaimAmount ~ VehPower + VehAge + DrivAge + BonusMalus + VehBrand + VehGas + Density + Area + Region
+    , data = train.cout
+    , method="rf"
+    , ntree = 100
+    # , weights = train[1:30000,]$Exposure
+    , tuneGrid= expand.grid(.mtry= mymtry)
+    # , trControl = trainControl(number = 10, method = "repeatedcv")
+  )
+  print("1 de +!")
+  runing_time <- c(runing_time, Sys.time())
+  print(difftime(Sys.time(), DEPART))
+  return(rf_model)
+}
+)
+
+load("data/cout_model_rf_runing_time.rda")
+RMSE_cout_model_rf_train <- lapply(cout_model_rf, function(model) return(model$results$RMSE)) %>% unlist
+RMSE_cout_model_rf_test <- lapply(cout_model_rf, function(model) return(RMSE(predict(model, test), test$MeanClaimAmount)))
+
+# Modèle finaux sur le coût
+
+# Construction de "data/cout_model_rf_final_runing_time.rda"
+
+DEPART <- Sys.time()
+runing_time <- c(DEPART)
+cout_model_rf_final <- lapply(1:5, function(mymtry)
+{
+  rf_model <- train(
+    MeanClaimAmount ~ VehPower + VehAge + DrivAge + BonusMalus + VehBrand + VehGas + Density + Area + Region
+    , data = train.cout
+    , method="rf"
+    , ntree = 1000
+    # , weights = train[1:30000,]$Exposure
+    , tuneGrid= expand.grid(.mtry= mymtry)
+    , trControl = trainControl(number = 10, method = "repeatedcv")
+  )
+  runing_time <- c(runing_time, Sys.time())
+  print(difftime(Sys.time(), DEPART))
+  return(rf_model)
+}
+)
+
+load("data/cout_model_rf_final_runing_time.rda")
+
+RMSE_cout_model_rf_train_final <- lapply(cout_model_rf_final, function(model) return(model$results$RMSE)) %>% unlist
+RMSE_cout_model_rf_test_final <- lapply(
+  cout_model_rf_final
+  , function(model) 
+    return(
+      RMSE(
+        predict(model, test[test$MeanClaimAmount >0, ]),
+        pred =  test$MeanClaimAmount[test$MeanClaimAmount >0]
+        )
+      )
+  ) %>% unlist
+
+biais_cout_finaux <- lapply(
+  cout_model_rf_final
+  , function(model)
+   return(
+     - mean(predict(model, test[test$MeanClaimAmount >0,])) + mean(test$MeanClaimAmount[test$MeanClaimAmount >0])
+   )
+) %>% unlist()
+
+runing_time_final <- runing_time
+
+save(RMSE_cout_model_rf_train_final, RMSE_cout_model_rf_test_final, runing_time_final, biais_cout_finaux, file = "data/cout_model_rf_final_runing_time_results.rda")
+
+# rf_cout_final_mtry_1 <- cout_model_rf_final[[1]]
+# rf_cout_final_mtry_1$trainingData <- NULL
+# rf_cout_final_mtry_2 <- cout_model_rf_final[[2]]
+# rf_cout_final_mtry_2$trainingData <- NULL
+# rf_cout_final_mtry_3 <- cout_model_rf_final[[3]]
+# rf_cout_final_mtry_3$trainingData <- NULL
+# rf_cout_final_mtry_4 <- cout_model_rf_final[[4]]
+# rf_cout_final_mtry_4$trainingData <- NULL
+# rf_cout_final_mtry_5 <- cout_model_rf_final[[5]]
+# rf_cout_final_mtry_5$trainingData <- NULL
+# 
+# save(rf_cout_final_mtry_1, file = "data/cout_model_final_mtry1.rda", compression_level = 9)
+# save(rf_cout_final_mtry_2, file = "data/cout_model_final_mtry2.rda", compression_level = 9)
+# save(rf_cout_final_mtry_3, file = "data/cout_model_final_mtry3.rda", compression_level = 9)
+# save(rf_cout_final_mtry_4, file = "data/cout_model_final_mtry4.rda", compression_level = 9)
+# save(rf_cout_final_mtry_5, file = "data/cout_model_final_mtry5.rda", compression_level = 9)
+
+# Modèles sur la fréquence : recherche du mtry optimal
+
+# Construction de "data/1_20mtryonfreqresults.rdata" - freq_model_rf
+# Nous avons computé sous forme de liste pour pouvoir conserver toutes les forets et prédire ainsi sur un énorme échantillon de test
+
+.Proportion.Wanted = 0.10
+.index_entrainement <- (1:nrow(base.mean)) %>% sample(.,size = .Proportion.Wanted * nrow(base.mean))
+test_freq_model_rf <- base.mean[.index_entrainement,]
+train_freq_model_rf  <- base.mean[! seq(from = 1, to = nrow(base.mean)) %in% .index_entrainement, ]
+
+freq_model_rf <- lapply(1:20,
+  function(mymtry)
+  {
+    model <- train( ClaimNb ~ Area + VehPower + VehAge + DrivAge + 
+                      BonusMalus + VehBrand + VehGas + Region + Density,
+                    data = train_freq_model_rf,
+                    tuneGrid = expand.grid(.mtry = mymtry),
+                    trControl = trainControl(number = 10, method = "repeatedcv"),
+                    ntree = 100,
+                    method = "rf"
+    ) %>% return()
+  }
+)
+
+load(file = "data/1_20mtryonfreqresults.rdata")
+
+save(RMSE_training_freq_model_rf, RMSE_predictions_freq_model_rf, file = "data/1_20mtryonfreq_results.rda")
 
 
+# Maintenant, 3 modèles pour tester rapidement comment agencer la variable exposure avant de lancer le dernier modèle
+
+#construction de "data/rf_freq_mtry_3_ntree_500_Exposure_as_weights.rda"
+
+# load(file = "data/rf_freq_mtry_3_ntree_500_Exposure_as_weights.rda")
+
+rf_freq_mtry_3_ntree_500_Exposure_as_weights <- train(
+  ClaimNb ~ VehPower + VehAge + DrivAge + 
+    BonusMalus + VehBrand + VehGas + Density + Area + Region,
+  data = train[1:30000,],
+  method = "rf",
+  ntree = 500,
+  weights = train[1:30000,]$Exposure,
+  trControl = trainControl(number = 10, 
+                           method = "repeatedcv"),
+  tuneGrid = expand.grid(.mtry = 3)
+)
+
+#construction de "data/rf_freq_mtry_3_ntree_500_Exposure_devided.rda"
+
+# load("data/rf_freq_mtry_3_ntree_500_Exposure_devided.rda")
+
+rf_freq_mtry_3_ntree_500_Exposure_devided <- train(
+  ClaimNb/Exposure ~ VehPower + VehAge + DrivAge + 
+    BonusMalus + VehBrand + VehGas + Density + Area + Region,
+  data = train[1:30000,],
+  method = "rf",
+  ntree = 500,
+  trControl = trainControl(number = 10, 
+                           method = "repeatedcv"),
+  tuneGrid = expand.grid(.mtry = 3)
+)
+
+#construction de "data/rf_freq_mtry_3_ntree_500_Exposure_exp.rda"
+
+# load("data/rf_freq_mtry_3_ntree_500_Exposure_exp.rda")
+
+rf_freq_mtry_3_ntree_500_Exposure_exp <- train(
+  ClaimNb ~ VehPower + VehAge + DrivAge + 
+    BonusMalus + VehBrand + VehGas + Density + Area + Region + Exposure,
+  data = train[1:30000,],
+  method = "rf",
+  ntree = 500,
+  trControl = trainControl(number = 10, 
+                           method = "repeatedcv"),
+  tuneGrid = expand.grid(.mtry = 3)
+)
+
+# Comparaisons des trois forêts
+
+# prédissons !
+
+predict(rf_freq_mtry_3_ntree_500_Exposure_as_weights, test, weights = test$Exposure) -> pred_rf_freq_mtry_3_ntree_500_Exposure_as_weights
+predict(rf_freq_mtry_3_ntree_500_Exposure_devided, test) * test$Exposure -> pred_rf_freq_mtry_3_ntree_500_Exposure_devided
+predict(rf_freq_mtry_3_ntree_500_Exposure_exp, test) -> pred_rf_freq_mtry_3_ntree_500_Exposure_exp
+
+RMSE(pred = pred_rf_freq_mtry_3_ntree_500_Exposure_as_weights, test$ClaimNb)
+RMSE(pred = pred_rf_freq_mtry_3_ntree_500_Exposure_devided, test$ClaimNb)
+RMSE(pred = pred_rf_freq_mtry_3_ntree_500_Exposure_exp, test$ClaimNb)
+
+# Il ne reste plus qu'à sortir le modèle final!
+# Naturellement, on exclus le fait de diviser par l'exposition même si ça peut paraître allaichant
+
+rf_freq_final_expo_as_weights <- train(
+  ClaimNb ~ VehPower + VehAge + DrivAge + 
+    BonusMalus + VehBrand + VehGas + Density + Area + Region,
+  data = train[1:100000,],
+  method = "rf",
+  ntree = 500,
+  weights = train$Exposure[1:100000],
+  trControl = trainControl(number = 10, 
+                           method = "repeatedcv"),
+  tuneGrid = expand.grid(.mtry = 3)
+)
+
+rf_freq_final_expo_as_weights <- train(
+  ClaimNb ~ VehPower + VehAge + DrivAge + 
+    BonusMalus + VehBrand + VehGas + Density + Area + Region,
+  data = train[1:100000,],
+  method = "rf",
+  ntree = 500,
+  weights = train$Exposure[1:100000],
+  trControl = trainControl(number = 10, 
+                           method = "repeatedcv"),
+  tuneGrid = expand.grid(.mtry = 3)
+)
+
+load("data/rf_freq_final_expo_as_exp.rda")
+load("data/rf_freq_final_expo_as_weights.rda")
+
+rf_freq_final_expo_as_exp$results$RMSE
+RMSE(pred = predict(rf_freq_final_expo_as_exp, test), obs = test$ClaimNb)
+biais_expo_as_exp <- mean(predict(rf_freq_final_expo_as_exp)) - mean(test$ClaimNb)
+biais_expo_as_exp
 
 
+rf_freq_final_expo_as_weights$results$RMSE
+RMSE(pred = predict(rf_freq_final_expo_as_exp, test, weights = test$Exposure), obs = test$ClaimNb)
+biais_expo_as_weights <- mean(predict(rf_freq_final_expo_as_weights)) - mean(test$ClaimNb)
+biais_expo_as_weights
+
+biais_expo_as_exp > biais_expo_as_weights
 
 
 #######################################################################################################
