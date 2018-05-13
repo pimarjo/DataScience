@@ -57,18 +57,7 @@ Nous avons calculé la moyenne des coûts des sinistres par polices sur la base 
 
 Nous avons ensuite fusionné les bases **freMTPLsev** et **freMTPLfreq** par **IDpol** maintenant unique sur les deux bases.
 
-Il vient ensuite une base sur laquelle nous retirons les sinistres graves (ceux supérieures à $20 000$). Ce seuil a été déterminé rapidement par l'étude d'un mean-excess plot. Ces quelques sinistres biaisais fortement nos modélisations et seront répartie comme une sur-prime sur l'ensemble de nos assurés. La sur-prime est évaluée à
-
-```{r surprime, echo=FALSE}
-library(CASdatasets)
-load("./data/trainandtest.rda")
-load("./data/trainandtestgraves.rda")
-test.graves <- cbind(test.graves, ClaiAmount = test.graves$ClaimNb*test.graves$MeanClaimAmount)
-train.graves <- cbind(train.graves, ClaiAmount = train.graves$ClaimNb*train.graves$MeanClaimAmount)
-surprime <- (sum(test.graves$ClaiAmount)+sum(train.graves$ClaiAmount))/(sum(train$Exposure)+sum(test$Exposure))
-surprime
-```
-
+Il vient ensuite une base sur laquelle nous retirons les sinistres graves (ceux supérieures à $20 000$). Ce seuil a été déterminé rapidement par l'étude d'un mean-excess plot. Ces quelques sinistres biaisais fortement nos modélisations et seront répartie comme une sur-prime sur l'ensemble de nos assurés.
 
 Nous basons nos modélisations sur seulement $70%$ de nos données pour se laisser une bonne marge de test. Ensuite, pour les procédures plus lourde (typiquement le gradian boosting et les réseaux de neuronnes) les derniers modèles retenus ont été entraîner sur un sous jeux de cette base d'entraînement.
 
@@ -141,7 +130,7 @@ On va refaire pousser des fôrets cette fois-ci en poussant le nombre d'arbre à
 
 Enfin,après avoir poussé le nombre d'arbre par forêts :
 
-```{r final cout graph, echo = FALSE}
+```{r final cout graph, echo = FALSE, fig.height=7, fig.width=10}
 
 load("data/cout_model_rf_final_runing_time_results.rda")
 
@@ -270,7 +259,7 @@ colnames(best_rf_model_freq) <- c("Proportion de donnée","RMSE entrainement", "
 best_rf_model_freq[,1] <- c("15%", "15%")
 best_rf_model_freq[,2] <- c(rf_freq_final_expo_as_weights$results$RMSE, rf_freq_final_expo_as_exp$results$RMSE)
 best_rf_model_freq[,3] <- c(RMSE(pred = predict(rf_freq_final_expo_as_weights, test, weights = test$Exposure), obs = test$ClaimNb), RMSE(pred = predict(rf_freq_final_expo_as_exp, test), obs = test$ClaimNb))
-best_rf_model_freq[,4] <- c(mean(predict(rf_freq_final_expo_as_weights)) - mean(test$ClaimNb), mean(predict(rf_freq_final_expo_as_exp)) - mean(test$ClaimNb))
+best_rf_model_freq[,4] <- c(mean(predict(rf_freq_final_expo_as_weights,test, weights = test$ClaimNb)) - mean(test$ClaimNb), mean(predict(rf_freq_final_expo_as_exp, test)) - mean(test$ClaimNb))
 
 print(best_rf_model_freq)
 
