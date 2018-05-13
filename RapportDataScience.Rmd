@@ -3,7 +3,7 @@ title: "Rapport Data Science"
 author: "Mehdi KHAIROUN, William LAURENT, Pierre MARJOLLET, Afaf TABAMMOUT"
 date: "9 avril 2018"
 output:
-  html_document:
+  word_document:
     df_print: paged
 ---
 
@@ -227,32 +227,36 @@ mod.freq.xgb <- xgb.load("./xgboost/mod.freq.xgb.xgboost")
 ```
 
 
-A. Préparation des données
+## A. Préparation des données
 Dans cette partie nous décrivons succintement les résultats obtenus par une modélisation GBM avec arbres de régression. Nous procédons à une décomposition fréquence coût moyen. Dans toute cette partie, nous utiliserons le package "xgboost", qui implémente de façon plus efficiente le GBM que le package "gbm".
 
 Sans entrer dans les détails techniques, nous listons ici les différents problèmes rencontrés dans la mise en forme des données pour le package xgboost.
 
 1. La fonction de fit ne prend en entrée que des variables numériques (c'est classique en machine learning): nous utilisons le package "caret" pour créer des flags de nos variables catégorielles.
 2. Pour utiliser la fonction la plus complète du package pour l'entrainement (xgb.train), nous devons passer les données en entrée au format xgb.DMatrix
-3. Pour la modélisation de la fréquence, où la base utilisée est déjà très volumineuse, créer des flags de variables catégorielles avec relativement beaucoup de modalités pose des problèmes de stockage (en effet, nos pc ne sont pas des machines de guerre):
+3. Pour la modélisation de la fréquence, où la base utilisée est déjà très volumineuse, créer des flags de variables catégorielles avec relativement beaucoup de modalités pose des problèmes de stockage (en effet, nos pc ne sont pas des machines de guerre):  
     3.1. Une des fonctions, xgboost, permet de passer en paramètre des sparse Matrix, mais la fonction est moins complète au niveau du contrôle des paramètres de tuning.
     3.2. Nous créons sur une machine puissante les flags, et nos enregistrons les données au format xgb.DMatrix en dur. 
                                                                        
-B. Modèle de coût
+## B. Modèle de coût
                                                                        
 On optimise les paramètres de tuning avec une grid search à l'aide du package caret: on fixe un petit nombre d'arbres (10) pour entrainemer les modèles et on cherche les paramètre optimaux à l'aide d'une cross validation. On utilise le RMSE comme critère de choix de modèle.
+
 On identifie des paramètres important pour éviter l'overfitting: min_child_weight, subsample, col_sample.
+
 Le RMSE semble être plus sensibles aux paramètres max_depth (la profondeur maximale des arbres), nround (le nombre d'arbre).
+
 Le temps de calcul est très sensible aux paramètres max_depth et nrounds. En outre, le temps de calcul est très sensibles au volume des données passées en entrée.
 
 Nos paramètres optimaux sont:
 
-  Nous cherchons maintenantle nombre otpimal d'arbres. Nous obtenons 386 arbres. \p
+Nous cherchons maintenantle nombre otpimal d'arbres. Nous obtenons 386 arbres.
+  
 Voici une représentation graphique du RMSE en fonction du nombre d'abres:
   
   
   
-  Nous pouvons également nous intéresser à l'influence respective de chaque variable explicative:
+Nous pouvons également nous intéresser à l'influence respective de chaque variable explicative:
 
 ``` {r imp.cout, echo = FALSE}
 
@@ -271,7 +275,7 @@ Le biais que présente notre modèle d'environ :
 
 pred.cout <- predict(mod.cout.xgb, test.cout.xgb)
 mean(pred.cout) - mean(test.cout$label)
-(pred.cout - test.cout$label)^2 %>% mean() %>% sqrt() -> xgb.test.cout.RMSE 
+(pred.cout - test.cout$label)^2 %>% mean() %>% sqrt()
 
 
 ```
@@ -290,7 +294,7 @@ Le RMSE sur la base de test est:
 Le test de notre modèle sur la base de test révèle que notre modèle possède un biais de plusieurs dizaines, à la baisse. Cela signifie que nous sous-estimons les montants des sinistres attritionnels.
 
 
-C. Modèle de fréquence
+## C. Modèle de fréquence
 
 Nous devons prendre en compte l'exposition. Nous définissons la variable à expliquer comme le nombre annuel de sinistres. Nous divisons donc le nombre de sinistres par l'exposition pour chaque police et nous pondérons également les observations par l'exposition.
 
