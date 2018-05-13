@@ -281,11 +281,7 @@ Le RMSE sur la base de test est:
 
 ```{r predict.cout.rmse, echo = FALSE} 
 
-
-pred.cout <- predict(mod.cout.xgb, test.cout.xgb)
-mean(pred.cout) - mean(test.cout$label)
-(pred.cout - test.cout$label)^2 %>% mean() %>% sqrt() -> xgb.test.cout.RMSE 
-
+(pred.cout - test.cout$label)^2 %>% mean() %>% sqrt() 
 
 ```
 
