@@ -16,7 +16,7 @@ text-align: justify}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-![](images/logoisfa.jpg) 
+<!-- ![](images/logoisfa.jpg)  -->
 
 ***
 
@@ -132,7 +132,7 @@ Nous pouvons également nous intéresser à l'influence respective de chaque var
 Le test de notre modèle sur la base de test révèle que notre modèle possède un biais de plusieur dizaines, à la baisse. Cela signifie que nous sous-estimons les montants des sinistres attritionnels.
 
 
-  B. Modèle de fréquence
+  C. Modèle de fréquence
 
 Nous devons prendre en compte l'exposition. Nous définissons la variable à expliquer comme le nombre annuel de sinistres. Nous divisons donc le nombre de sinistres par l'exposition pour chaque police, nous multiplierons la prediction par l'exposition. Nous pondérons également les observations par l'exposition.
 
